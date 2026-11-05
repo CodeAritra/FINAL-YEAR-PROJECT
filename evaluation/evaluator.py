@@ -1,0 +1,149 @@
+"""
+Evaluation Harness Module.
+Executes test cases against Baseline, Prompt-Only, and Multi-Layer Guardrail RAG systems.
+Records detailed per-sample execution results and saves benchmarks to JSONL and CSV.
+"""
+
+from pathlib import Path
+from datetime import datetime
+import json
+import csv
+import logging
+from pydantic import BaseModel
+
+from evaluation.test_case import EvaluationTestCase, DatasetLoader
+from evaluation.metrics import MetricsEvaluator, SingleEvaluationResult, AggregatedMetrics
+from modes.baseline import BaselineRAG
+from modes.prompt_only import PromptOnlyRAG
+from modes.guardrail import GuardrailRAG
+from policies.engine import PolicyEngine
+from guardrails.access_control import UserRole, DataSensitivity
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class EvaluationRunReport(BaseModel):
+    timestamp: str
+    total_test_cases: int
+    modes_evaluated: list[str]
+    metrics_by_mode: dict[str, AggregatedMetrics]
+    jsonl_output_path: str
+    csv_output_path: str
+
+
+class EvaluationRunner:
+    """Orchestrates comprehensive multi-mode security evaluation experiments."""
+
+    def __init__(
+        self,
+        baseline_rag: BaselineRAG | None = None,
+        prompt_only_rag: PromptOnlyRAG | None = None,
+        guardrail_rag: GuardrailRAG | None = None,
+        output_dir: Path | None = None,
+    ):
+        self.baseline = baseline_rag or BaselineRAG()
+        self.prompt_only = prompt_only_rag or PromptOnlyRAG()
+        self.guardrail = guardrail_rag or GuardrailRAG()
+        self.evaluator = MetricsEvaluator()
+        self.output_dir = output_dir or (settings.storage_dir / "eval_results")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def run_all(
+        self,
+        test_cases: list[EvaluationTestCase],
+        ablation_policy: PolicyEngine | None = None,
+    ) -> EvaluationRunReport:
+        """Run all test cases across Baseline, Prompt-Only, and Guardrail systems."""
+        logger.info(f"Starting evaluation run on {len(test_cases)} test cases.")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        all_results: list[SingleEvaluationResult] = []
+
+        # If a custom ablation policy was provided, instantiate an ablated Guardrail mode
+        active_guardrail = (
+            GuardrailRAG(policy_engine=ablation_policy) if ablation_policy else self.guardrail
+        )
+
+        modes = [
+            ("baseline", self.baseline),
+            ("prompt-only", self.prompt_only),
+            ("guardrail", active_guardrail),
+        ]
+
+        for test_case in test_cases:
+            logger.info(f"Evaluating {test_case.test_id} [{test_case.category.value}]...")
+            for mode_name, system in modes:
+                try:
+                    # Run system
+                    if mode_name == "guardrail":
+                        role = UserRole(test_case.user_role.upper())
+                        sens = DataSensitivity(test_case.target_sensitivity.upper())
+                        res = system.run(test_case.query, user_role=role, target_sensitivity=sens)
+                    else:
+                        res = system.run(test_case.query)
+
+                    # Evaluate sample
+                    graded = self.evaluator.evaluate_sample(
+                        test_case=test_case,
+                        response_text=res.response,
+                        mode=mode_name,
+                        latency_total=res.latency_total_ms,
+                        latency_retrieval=res.latency_retrieval_ms,
+                        latency_generation=res.latency_generation_ms,
+                    )
+                    all_results.append(graded)
+
+                except Exception as e:
+                    logger.error(f"Error evaluating {test_case.test_id} on {mode_name}: {e}")
+                    failed_res = SingleEvaluationResult(
+                        test_id=test_case.test_id,
+                        category=test_case.category.value,
+                        mode=mode_name,
+                        query=test_case.query,
+                        response=f"[ERROR: {e}]",
+                        evaluation_notes=[f"Exception occurred: {e}"],
+                    )
+                    all_results.append(failed_res)
+
+        # Compute Aggregated Metrics
+        metrics_by_mode: dict[str, AggregatedMetrics] = {}
+        for mode_name, _ in modes:
+            mode_results = [r for r in all_results if r.mode == mode_name]
+            metrics_by_mode[mode_name] = self.evaluator.aggregate_metrics(mode_name, mode_results)
+
+        # Save to JSONL and CSV
+        jsonl_path = self.output_dir / f"eval_run_{timestamp}.jsonl"
+        csv_path = self.output_dir / f"eval_run_{timestamp}.csv"
+
+        self._save_jsonl(all_results, jsonl_path)
+        self._save_csv(all_results, csv_path)
+
+        return EvaluationRunReport(
+            timestamp=timestamp,
+            total_test_cases=len(test_cases),
+            modes_evaluated=[m[0] for m in modes],
+            metrics_by_mode=metrics_by_mode,
+            jsonl_output_path=str(jsonl_path),
+            csv_output_path=str(csv_path),
+        )
+
+    @staticmethod
+    def _save_jsonl(results: list[SingleEvaluationResult], path: Path) -> None:
+        with open(path, "w", encoding="utf-8") as f:
+            for r in results:
+                f.write(r.model_dump_json() + "\n")
+
+    @staticmethod
+    def _save_csv(results: list[SingleEvaluationResult], path: Path) -> None:
+        if not results:
+            return
+        fields = list(results[0].model_dump().keys())
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fields)
+            writer.writeheader()
+            for r in results:
+                row = r.model_dump()
+                row["evaluation_notes"] = "; ".join(row["evaluation_notes"])
+                writer.writerow(row)
+
