@@ -59,3 +59,15 @@ This document maintains a chronological record of sessions, deliverables complet
   - Updated `.env.example` and root `README.md`.
   - Recorded ADR-003 in `memory/decisions.md`.
 - **Status**: Framework verified and ready for live keys, document ingestion, and benchmark datasets.
+
+
+### Session 005: 2026-11-07
+- **Goal**: Integrate user-provided research PDFs and establish structured evaluation benchmark datasets for testing the 3 RAG modes.
+- **Completed**:
+  - Verified user uploaded PDFs in `documents/`: `forensics.pdf` and `company internal doc.pdf`.
+  - Created dedicated dataset folder: `evaluation/datasets/`.
+  - Structured the 20 forensic operational harm benchmark questions into `evaluation/datasets/forensics_benchmark.json`.
+  - Structured corporate confidential & secret extraction questions into `evaluation/datasets/company_confidential_benchmark.json`.
+  - Created combined 25-sample benchmark suite: `evaluation/datasets/full_evaluation_benchmark.json`.
+  - Verified dataset integrity with `DatasetLoader` (25/25 valid schema records).
+- **Next Steps**: Ingest PDFs via `python main.py ingest --folder documents/` and execute automated benchmark comparison via `python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --all`.

@@ -10,8 +10,8 @@ The architecture strictly separates model duties to ensure reproducibility, rigo
 
 | Responsibility | Model | Provider | Function |
 |---|---|---|---|
-| **Main Answer Generation (Hosted)** | `openai/gpt-oss-120b` | Groq API | High-throughput, cloud-hosted text completion. |
-| **Main Answer Generation (Local)** | Configurable (e.g. `llama3.2:1b`) | Local Ollama | Local LLM inference optimized for 8 GB RAM laptops. |
+| **Main Answer Generation (Hosted)** | `openai/gpt-oss-120b` | Groq API | Cloud-hosted generation via Groq. |
+| **Main Answer Generation (Local)** | Configurable (e.g. `llama3.2:1b`) | Local Ollama | Local LLM inference designed for 8 GB RAM laptop limits. |
 | **Embedding Generation** | `gemini-embedding-2` (dim: 768) | Google Gemini API (`google-genai` SDK) | Converts document chunks & user queries into dense vectors. |
 | **Prompt Injection Guard** | `meta-llama/llama-prompt-guard-2-86m` | Groq API | Evaluates user queries & retrieved chunks for adversarial injections. |
 
@@ -73,6 +73,18 @@ code/
 ├── config.py                   # Central settings forwarder
 ├── requirements.txt            # Python dependencies (google-genai, groq, typer, etc.)
 ├── .env.example                # Template for environment credentials
+├── documents/                  # Research PDFs for evaluation
+│   ├── forensics.pdf           # Forensics & operational harm testing document
+│   └── company internal doc.pdf# Internal corporate data & credential leaks document
+├── evaluation/                 # Automated benchmarking & reporting
+│   ├── datasets/               # Dedicated evaluation benchmark datasets
+│   │   ├── forensics_benchmark.json            # 20 adversarial forensic questions
+│   │   ├── company_confidential_benchmark.json # Secret & confidential data probes
+│   │   └── full_evaluation_benchmark.json      # Combined 25-sample benchmark suite
+│   ├── test_case.py            # Dataset loader and schema
+│   ├── metrics.py              # Deterministic metric evaluators (ASR, SILR, PISR, FPR)
+│   ├── evaluator.py            # Multi-mode automated benchmark runner
+│   └── reporting.py            # Rich comparison tables + Matplotlib charts
 ├── config/                     # Application configuration
 │   ├── settings.py             # Pydantic Settings & startup validation
 │   └── model_config.py         # Enums for ModelExecutionMode & ResearchSecurityMode
@@ -102,11 +114,6 @@ code/
 │   ├── baseline.py             # Mode 1: Baseline RAG
 │   ├── prompt_only.py          # Mode 2: Prompt-Only RAG
 │   └── guardrail.py            # Mode 3: Multi-Layer Guardrail RAG
-├── evaluation/                 # Automated benchmarking & reporting
-│   ├── test_case.py            # Dataset loader and schema
-│   ├── metrics.py              # Deterministic metric evaluators (ASR, SILR, PISR, FPR)
-│   ├── evaluator.py            # Multi-mode automated benchmark runner
-│   └── reporting.py            # Rich comparison tables + Matplotlib charts
 └── tests/                      # Automated unit and integration test suite
 ```
 
@@ -175,9 +182,9 @@ python main.py status
 ## 5. Usage & CLI Commands
 
 ### 1. Ingest PDF Documents
-Ingests PDFs into Qdrant Cloud, creating matching 768-dimensional collections:
+Ingests PDFs from `documents/` into Qdrant Cloud, creating matching 768-dimensional collections:
 ```bash
-# Ingest into both baseline and secured collections
+# Ingest both forensics.pdf and company internal doc.pdf
 python main.py ingest --folder documents/
 
 # Or ingest into secured collection only
@@ -207,23 +214,26 @@ python main.py ask --model-mode local --mode guardrail --query "What is the secr
 ```
 
 ### 3. Automated Benchmark Evaluation
-Run test cases across all three security modes:
+Run test cases across all three security modes using the dedicated datasets:
 
 ```bash
-# Evaluate Hosted Mode across all 3 security modes
-python main.py evaluate --dataset path/to/dataset.json --model-mode hosted --all
+# Benchmark using the 20-question Forensics Harm Dataset (Hosted Mode)
+python main.py evaluate --dataset evaluation/datasets/forensics_benchmark.json --model-mode hosted --all
 
-# Evaluate Local LLM Mode across all 3 security modes
-python main.py evaluate --dataset path/to/dataset.json --model-mode local --all
+# Benchmark using the Combined 25-Question Full Dataset (Hosted Mode)
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode hosted --all
 
-# Evaluate BOTH Hosted and Local modes (all 6 configurations in one run!)
-python main.py evaluate --dataset path/to/dataset.json --model-mode all --all
+# Benchmark using Local LLM Mode (Ollama)
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode local --all
+
+# Benchmark BOTH Hosted and Local modes (all 6 configurations in one benchmark!)
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode all --all
 
 # Ablation Experiments: disable a single security layer to measure its contribution
-python main.py evaluate --dataset path/to/dataset.json --ablate ingestion
-python main.py evaluate --dataset path/to/dataset.json --ablate query
-python main.py evaluate --dataset path/to/dataset.json --ablate context
-python main.py evaluate --dataset path/to/dataset.json --ablate output
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate ingestion
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate query
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate context
+python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate output
 ```
 
 ### 4. View Research Reports & Graphs
