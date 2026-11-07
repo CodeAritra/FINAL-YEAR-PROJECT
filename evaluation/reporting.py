@@ -1,7 +1,7 @@
 """
 Evaluation Reporting and Chart Generation Module.
 Outputs Rich terminal tables and renders publication-ready Matplotlib comparison graphs
-for research analysis and publication.
+differentiating between Hosted (Groq) and Local (Ollama) execution modes.
 """
 
 from pathlib import Path
@@ -25,27 +25,30 @@ class EvaluationReporter:
     def print_terminal_report(report: EvaluationRunReport) -> None:
         """Display formatted comparison metrics in the terminal using Rich."""
         table = Table(
-            title=f"🔬 Security Evaluation Benchmark Results [Run: {report.timestamp}]",
+            title=f"[*] Security Evaluation Benchmark Results [Run: {report.timestamp}]",
             header_style="bold magenta",
         )
 
-        table.add_column("System Mode", style="cyan", no_wrap=True)
+        table.add_column("Security Mode", style="cyan", no_wrap=True)
+        table.add_column("Exec Mode", style="yellow")
+        table.add_column("Main Model", style="dim white")
         table.add_column("ASR (%)", justify="right", style="red")
         table.add_column("SILR (%)", justify="right", style="bright_red")
         table.add_column("PISR (%)", justify="right", style="bright_yellow")
         table.add_column("FPR (%)", justify="right", style="yellow")
         table.add_column("Safe Acc (%)", justify="right", style="green")
         table.add_column("Refusal Acc (%)", justify="right", style="bright_green")
-        table.add_column("Mean Total Lat (ms)", justify="right", style="blue")
+        table.add_column("Mean Lat (ms)", justify="right", style="blue")
 
-        for mode_name in report.modes_evaluated:
-            m: AggregatedMetrics = report.metrics_by_mode.get(mode_name)
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
             if not m:
                 continue
 
-            # Format row
             table.add_row(
                 m.mode.upper(),
+                m.model_mode.upper(),
+                m.model_name[:24],
                 f"{m.attack_success_rate:.1f}%",
                 f"{m.sensitive_info_leakage_rate:.1f}%",
                 f"{m.prompt_injection_success_rate:.1f}%",
@@ -62,13 +65,13 @@ class EvaluationReporter:
 
     @staticmethod
     def generate_research_charts(report: EvaluationRunReport, output_path: str | Path | None = None) -> str:
-        """Generate side-by-side Matplotlib bar charts comparing Baseline, Prompt-Only, and Guardrail."""
+        """Generate side-by-side Matplotlib bar charts comparing configurations."""
         modes = report.modes_evaluated
         if not modes:
             return ""
 
         metrics_list = [report.metrics_by_mode[m] for m in modes if m in report.metrics_by_mode]
-        labels = [m.mode.title() for m in metrics_list]
+        labels = [f"{m.mode.title()}\n({m.model_mode})" for m in metrics_list]
 
         asrs = [m.attack_success_rate for m in metrics_list]
         silrs = [m.sensitive_info_leakage_rate for m in metrics_list]
@@ -76,9 +79,9 @@ class EvaluationReporter:
         fprs = [m.false_positive_rate for m in metrics_list]
         latencies = [m.avg_latency_total_ms for m in metrics_list]
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5), dpi=300)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(max(12, len(labels) * 2.2), 5.5), dpi=300)
 
-        # Plot 1: Security Risk Rates (Lower is Better)
+        # Plot 1: Security Violation Rates (Lower is Better)
         x = range(len(labels))
         width = 0.2
 
@@ -87,18 +90,19 @@ class EvaluationReporter:
         ax1.bar([i + 0.5 * width for i in x], pisrs, width=width, label="Prompt Injection (PISR)", color="#e76f51")
         ax1.bar([i + 1.5 * width for i in x], fprs, width=width, label="False Positives (FPR)", color="#2a9d8f")
 
-        ax1.set_title("Security Violation Rates (%) [Lower is Better]", fontsize=12, fontweight="bold")
+        ax1.set_title("Security Violation Rates (%) [Lower is Better]", fontsize=11, fontweight="bold")
         ax1.set_xticks(x)
-        ax1.set_xticklabels(labels, fontweight="bold")
+        ax1.set_xticklabels(labels, fontweight="bold", fontsize=9)
         ax1.set_ylabel("Violation Rate (%)")
         ax1.set_ylim(0, 105)
         ax1.grid(axis="y", linestyle="--", alpha=0.5)
-        ax1.legend(loc="upper right", fontsize=9)
+        ax1.legend(loc="upper right", fontsize=8)
 
         # Plot 2: Total Latency Overhead (ms)
-        colors = ["#457b9d", "#1d3557", "#2b9348"]
-        bars = ax2.bar(labels, latencies, color=colors[: len(labels)], width=0.45)
-        ax2.set_title("Average Total Latency (ms)", fontsize=12, fontweight="bold")
+        palette = ["#457b9d", "#1d3557", "#2b9348", "#6a4c93", "#e07a5f", "#3d405b"]
+        bar_colors = [palette[i % len(palette)] for i in range(len(labels))]
+        bars = ax2.bar(labels, latencies, color=bar_colors, width=0.45)
+        ax2.set_title("Average Total Latency (ms)", fontsize=11, fontweight="bold")
         ax2.set_ylabel("Latency (ms)")
         ax2.grid(axis="y", linestyle="--", alpha=0.5)
 
@@ -112,6 +116,7 @@ class EvaluationReporter:
                 ha="center",
                 va="bottom",
                 fontweight="bold",
+                fontsize=8,
             )
 
         plt.tight_layout()
@@ -126,4 +131,3 @@ class EvaluationReporter:
 
         logger.info(f"Research comparison chart saved to: {dest_path}")
         return str(dest_path)
-

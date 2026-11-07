@@ -53,3 +53,21 @@ This document tracks all significant architectural, architectural pattern, libra
 - **Consequences**:
   - Positive: Guarantees smooth execution under 8 GB RAM without sacrificing research rigor or accuracy.
   - Negative: Requires network access and API credentials stored safely in `.env`.
+
+
+### ADR-003: Dual Model Execution Modes (Hosted vs. Local Ollama) & Architecture Realignment
+- **Date**: 2026-11-05
+- **Status**: Accepted
+- **Deciders**: User, Architect Agent
+- **Context & Problem Statement**: The framework required strict delineation of model responsibilities, support for both cloud-hosted (Groq) and local LLM (Ollama) inference, removal of obsolete models (Sentence Transformers and Llama Guard 3), and integration of Gemini Embedding 2 and Llama Prompt Guard 2 86M.
+- **Considered Options**:
+  1. Monolithic provider bindings inside RAG modes.
+  2. Decoupled Provider-Service Architecture (`providers/` and `models/`) separating Model Execution Mode (`hosted` vs `local`) from Research Security Mode (`baseline`, `prompt-only`, `guardrail`).
+- **Decision Outcome**: Option 2.
+  - Main LLM: `openai/gpt-oss-120b` on Groq (Hosted) and configurable Ollama (Local).
+  - Embeddings: `gemini-embedding-2` (dim: 768) via Google GenAI SDK across both modes.
+  - Prompt Injection: `meta-llama/llama-prompt-guard-2-86m` via Groq API across both modes.
+  - Preserved: Presidio PII masking, custom regex & Shannon entropy secret detection, access control (RBAC), context delimiter framing, and secret leakage output interception.
+- **Consequences**:
+  - Positive: Produces 6 independent experiment configurations for research papers; keeps laptop memory footprint minimal under 8 GB RAM; strictly aligns with required model assignments.
+  - Negative: Requires valid API keys for Gemini and Groq in both modes.

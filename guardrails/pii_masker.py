@@ -43,13 +43,19 @@ class PIIMasker:
     def _init_presidio(self) -> None:
         """Initialize Presidio Analyzer and Anonymizer engines."""
         try:
+            import spacy
+            if not spacy.util.is_package("en_core_web_sm") and not spacy.util.is_package("en_core_web_lg"):
+                logger.info("spaCy language model not pre-installed. Using robust regex PII fallback.")
+                self.use_presidio = False
+                return
+
             from presidio_analyzer import AnalyzerEngine
             from presidio_anonymizer import AnonymizerEngine
 
             self.analyzer = AnalyzerEngine()
             self.anonymizer = AnonymizerEngine()
             logger.info("Presidio Analyzer & Anonymizer initialized successfully.")
-        except Exception as e:
+        except (Exception, SystemExit) as e:
             logger.warning(
                 f"Presidio engine initialization skipped ({e}). Using regex fallback for PII."
             )

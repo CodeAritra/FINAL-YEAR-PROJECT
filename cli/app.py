@@ -2,6 +2,9 @@
 CLI Application Module using Typer and Rich.
 Provides user-facing commands for document ingestion, multi-mode querying,
 automated evaluation benchmarking, and research reporting.
+Supports:
+- Two Model Execution Modes: Hosted (Groq GPT-OSS-120B) vs. Local (Ollama)
+- Three Research Security Modes: Baseline, Prompt-Only, and Multi-Layer Guardrail
 """
 
 from pathlib import Path
@@ -21,7 +24,8 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from config import settings
+from config.settings import settings
+from config.model_config import ModelExecutionMode, ResearchSecurityMode
 from ingestion.pipeline import IngestionPipeline
 from modes.baseline import BaselineRAG
 from modes.prompt_only import PromptOnlyRAG
@@ -32,6 +36,7 @@ from evaluation.evaluator import EvaluationRunner
 from evaluation.reporting import EvaluationReporter
 from database.qdrant_manager import QdrantManager
 from policies.engine import PolicyEngine
+from providers.ollama_provider import OllamaProvider
 
 app = typer.Typer(
     name="RAG Security Framework",
@@ -93,7 +98,14 @@ def ask(
         "guardrail",
         "--mode",
         "-m",
-        help="RAG execution mode: 'baseline', 'prompt-only', or 'guardrail'.",
+        "--security-mode",
+        help="Research security mode: 'baseline', 'prompt-only', or 'guardrail'.",
+    ),
+    model_mode: Optional[str] = typer.Option(
+        None,
+        "--model-mode",
+        "-M",
+        help="Model execution mode: 'hosted' (Groq GPT-OSS-120B) or 'local' (Ollama).",
     ),
     role: str = typer.Option(
         "RESEARCHER",
@@ -103,37 +115,49 @@ def ask(
     ),
     top_k: int = typer.Option(4, "--top-k", "-k", help="Number of retrieved snippets."),
 ):
-    """Query the RAG system under baseline, prompt-only, or multi-layer guardrail mode."""
+    """Query the RAG system under a chosen security mode and model execution mode."""
     if not query:
         query = typer.prompt("Enter your question")
 
-    mode_normalized = mode.lower().strip()
-    console.print(f"\n[bold cyan][*] Executing Query in Mode:[/bold cyan] [bold yellow]{mode_normalized.upper()}[/bold yellow]")
-    console.print(f"[dim]User Role: {role} | Top-K: {top_k}[/dim]\n")
+    active_model_mode = (model_mode or settings.model_mode).lower().strip()
+    sec_mode = mode.lower().strip()
+
+    # Validate setup
+    is_valid, warnings = settings.validate_setup(active_model_mode)
+    if not is_valid:
+        console.print("\n[bold yellow][!] Configuration Notice:[/bold yellow]")
+        for w in warnings:
+            console.print(f"  • {w}")
+        console.print("[dim]Using fallback simulation where credentials are empty.[/dim]\n")
+
+    console.print(f"\n[bold cyan][*] Query Execution:[/bold cyan]")
+    console.print(f"  • [bold white]Security Mode:[/bold white] [bold yellow]{sec_mode.upper()}[/bold yellow]")
+    console.print(f"  • [bold white]Model Execution Mode:[/bold white] [bold green]{active_model_mode.upper()}[/bold green]")
+    console.print(f"  • [bold white]User Role:[/bold white] {role} | [bold white]Top-K:[/bold white] {top_k}\n")
 
     try:
-        if mode_normalized == "baseline":
+        if sec_mode == "baseline":
             system = BaselineRAG()
-            result = system.run(query=query, top_k=top_k)
-        elif mode_normalized in ("prompt-only", "prompt_only"):
+            result = system.run(query=query, top_k=top_k, model_mode=active_model_mode)
+        elif sec_mode in ("prompt-only", "prompt_only"):
             system = PromptOnlyRAG()
-            result = system.run(query=query, top_k=top_k)
-        elif mode_normalized in ("guardrail", "secured"):
+            result = system.run(query=query, top_k=top_k, model_mode=active_model_mode)
+        elif sec_mode in ("guardrail", "secured"):
             system = GuardrailRAG()
             user_role = UserRole(role.upper())
-            result = system.run(query=query, user_role=user_role, top_k=top_k)
+            result = system.run(query=query, user_role=user_role, top_k=top_k, model_mode=active_model_mode)
         else:
-            console.print(f"[bold red]Unknown mode '{mode}'. Choose 'baseline', 'prompt-only', or 'guardrail'.[/bold red]")
+            console.print(f"[bold red]Unknown security mode '{mode}'. Choose 'baseline', 'prompt-only', or 'guardrail'.[/bold red]")
             raise typer.Exit(code=1)
 
         # Output Response
-        console.print(Panel(result.response, title=f"Generated Answer [{result.mode}]", border_style="green"))
+        console.print(Panel(result.response, title=f"Generated Answer [{result.mode} | {result.model_mode} - {result.model_name}]", border_style="green"))
 
         # Latency breakdown
         lat_table = Table(title="Latency Breakdown (ms)", header_style="bold blue")
         lat_table.add_column("Stage", style="cyan")
         lat_table.add_column("Latency (ms)", justify="right", style="white")
-        lat_table.add_row("Retrieval", f"{result.latency_retrieval_ms:.2f}")
+        lat_table.add_row("Retrieval (Gemini Embedding 2)", f"{result.latency_retrieval_ms:.2f}")
         lat_table.add_row("Generation", f"{result.latency_generation_ms:.2f}")
         lat_table.add_row("Total Pipeline", f"{result.latency_total_ms:.2f}")
         console.print(lat_table)
@@ -154,7 +178,13 @@ def evaluate(
     all_modes: bool = typer.Option(
         True,
         "--all",
-        help="Run evaluation across all three modes (baseline, prompt-only, guardrail).",
+        help="Run evaluation across all three security modes (baseline, prompt-only, guardrail).",
+    ),
+    model_mode: str = typer.Option(
+        "hosted",
+        "--model-mode",
+        "-M",
+        help="Model execution mode: 'hosted', 'local', or 'all' (evaluates both hosted & local).",
     ),
     ablate_layer: Optional[str] = typer.Option(
         None,
@@ -162,7 +192,7 @@ def evaluate(
         help="Disable specific guardrail layer for ablation: 'ingestion', 'query', 'context', 'output'.",
     ),
 ):
-    """Run automated benchmark evaluation across all three RAG systems."""
+    """Run automated benchmark evaluation across security modes and model execution modes."""
     console.print("\n[bold magenta][*] Multi-Layer RAG Security Evaluation Runner[/bold magenta]\n")
 
     if dataset is None or not dataset.exists():
@@ -188,7 +218,7 @@ def evaluate(
         )
 
     runner = EvaluationRunner()
-    report = runner.run_all(test_cases, ablation_policy=ablation_policy)
+    report = runner.run_all(test_cases, model_mode=model_mode, ablation_policy=ablation_policy)
 
     # Display Rich table
     EvaluationReporter.print_terminal_report(report)
@@ -218,7 +248,6 @@ def report(
     target_file = results_file or jsonl_files[0]
     console.print(f"\n[bold cyan][*] Inspecting Evaluation Run:[/bold cyan] [yellow]{target_file.name}[/yellow]")
 
-    # Read records and summarize
     records = []
     with open(target_file, "r", encoding="utf-8") as f:
         for line in f:
@@ -228,17 +257,19 @@ def report(
 
     console.print(f"Total evaluated samples: {len(records)}")
     modes = list(set(r.get("mode") for r in records))
-    console.print(f"Evaluated modes: {', '.join(modes)}")
+    model_modes = list(set(r.get("model_mode") for r in records))
+    console.print(f"Security modes: {', '.join(modes)}")
+    console.print(f"Model execution modes: {', '.join(model_modes)}")
 
 
 @app.command()
 def status():
-    """Check connectivity and operational health of Qdrant Cloud and model interfaces."""
+    """Check connectivity and operational health of Qdrant Cloud and model providers."""
     console.print("\n[bold cyan][*] System Status & Diagnostics[/bold cyan]\n")
 
     table = Table(title="Environment & Component Health", header_style="bold blue")
     table.add_column("Component", style="cyan")
-    table.add_column("Setting / Provider", style="white")
+    table.add_column("Configuration", style="white")
     table.add_column("Status", style="bold green")
 
     # Qdrant Check
@@ -249,13 +280,30 @@ def status():
     except Exception as e:
         table.add_row("Vector DB (Qdrant)", settings.qdrant_url, f"[red]Disconnected ({e})[/red]")
 
-    table.add_row("Embeddings", f"{settings.embedding_model_name} ({settings.device})", "Ready")
-    table.add_row("LLM Inference", f"{settings.llm_provider} ({settings.llm_model})", "Configured")
-    table.add_row("Prompt Injection Guard", f"{settings.prompt_injection_provider}", "Configured")
-    table.add_row("Harm Classifier", f"{settings.llama_guard_provider}", "Configured")
+    # Gemini Embedding 2 Check
+    gemini_key_status = "[green]Configured[/green]" if settings.gemini_api_key else "[yellow]Missing GEMINI_API_KEY[/yellow]"
+    table.add_row("Embedding Model", f"{settings.gemini_embedding_model} (dim: {settings.gemini_embedding_dimension})", gemini_key_status)
+
+    # Groq Main LLM Check
+    groq_key_status = "[green]Configured[/green]" if settings.groq_api_key else "[yellow]Missing GROQ_API_KEY[/yellow]"
+    table.add_row("Hosted Main LLM", f"Groq {settings.groq_model}", groq_key_status)
+
+    # Groq Llama Prompt Guard 2 Check
+    table.add_row("Prompt Guard (Groq)", settings.groq_prompt_guard_model, groq_key_status)
+
+    # Local Ollama Check
+    ollama = OllamaProvider()
+    if ollama.is_alive():
+        local_models = ollama.list_local_models()
+        models_str = ", ".join(local_models[:3]) if local_models else "no models pulled yet"
+        table.add_row("Local LLM (Ollama)", f"{settings.ollama_model} ({settings.ollama_base_url})", f"[green]Running[/green] ({models_str})")
+    else:
+        table.add_row("Local LLM (Ollama)", f"{settings.ollama_model} ({settings.ollama_base_url})", "[yellow]Offline (start with 'ollama serve')[/yellow]")
+
+    # Application Mode
+    table.add_row("Default Execution Mode", settings.model_mode.upper(), "Active")
     table.add_row("Presidio PII Engine", f"Enabled ({settings.presidio_language})", "Ready")
     table.add_row("Secret Regex Detector", "10 Default Patterns + Entropy", "Ready")
 
     console.print(table)
     console.print()
-

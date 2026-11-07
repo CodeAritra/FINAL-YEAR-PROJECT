@@ -43,3 +43,19 @@ This document maintains a chronological record of sessions, deliverables complet
   - Handled Windows codepage console output encoding for cross-platform reliability.
   - Authored comprehensive root [`README.md`](../README.md) detailing project purpose, directory layout, commands, and next steps.
 - **Next Steps**: Awaiting user's research PDFs, virtual GPU / cloud credentials in `.env`, and evaluation dataset to execute live benchmarks.
+
+
+### Session 004: 2026-11-05
+- **Goal**: Implement two selectable model execution modes (Hosted Groq vs. Local Ollama), integrate Gemini Embedding 2 and Groq Llama Prompt Guard 2 86M, and remove obsolete Sentence Transformers and Llama Guard components.
+- **Completed**:
+  - Installed `google-genai` and `groq` SDKs.
+  - Built modular provider layer: `providers/groq_provider.py`, `providers/gemini_provider.py`, `providers/ollama_provider.py`.
+  - Built high-level model services: `models/embedding_service.py` (Gemini Embedding 2, 768 dimensions), `models/llm_service.py` (routes Groq vs. Ollama), `models/prompt_guard_service.py` (Llama Prompt Guard 2 86M on Groq).
+  - Cleanly decoupled Model Execution Modes (`hosted` vs `local`) from Research Security Modes (`baseline`, `prompt-only`, `guardrail`), creating 6 distinct experiment configurations.
+  - Retired obsolete `sentence-transformers` and `harm_classifier.py` / Llama Guard 3.
+  - Updated `database/qdrant_manager.py` to support 768-dimensional collections and modern `query_points` API.
+  - Added comprehensive test suite in `tests/test_two_execution_modes.py` (11/11 tests passing).
+  - Updated CLI commands (`main.py ask --model-mode hosted|local --mode baseline|prompt-only|guardrail`, `evaluate --model-mode hosted|local|all`, `status`).
+  - Updated `.env.example` and root `README.md`.
+  - Recorded ADR-003 in `memory/decisions.md`.
+- **Status**: Framework verified and ready for live keys, document ingestion, and benchmark datasets.

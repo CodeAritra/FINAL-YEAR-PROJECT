@@ -4,56 +4,96 @@ A research-oriented framework and CLI platform designed to protect Retrieval-Aug
 
 ---
 
-## 1. Project Overview & Problem Statement
+## 1. AI Models & Responsibilities
 
-Standard RAG architectures blindly retrieve context from external documents and inject it into an LLM's prompt. This creates severe security vulnerabilities:
+The architecture strictly separates model duties to ensure reproducibility, rigorous security evaluation, and lightweight resource usage:
 
-1. **Confidential Information Leakage**: Passwords, API keys, tokens, and employee PII embedded in documents are exposed to end users.
-2. **Harmful Content Generation**: Operational instructions for dangerous materials (weapons, illegal drug synthesis) are retrieved and summarized.
-3. **Indirect Prompt Injection**: Adversarial instructions hidden inside PDFs hijack the LLM's reasoning and bypass safety policies.
+| Responsibility | Model | Provider | Function |
+|---|---|---|---|
+| **Main Answer Generation (Hosted)** | `openai/gpt-oss-120b` | Groq API | High-throughput, cloud-hosted text completion. |
+| **Main Answer Generation (Local)** | Configurable (e.g. `llama3.2:1b`) | Local Ollama | Local LLM inference optimized for 8 GB RAM laptops. |
+| **Embedding Generation** | `gemini-embedding-2` (dim: 768) | Google Gemini API (`google-genai` SDK) | Converts document chunks & user queries into dense vectors. |
+| **Prompt Injection Guard** | `meta-llama/llama-prompt-guard-2-86m` | Groq API | Evaluates user queries & retrieved chunks for adversarial injections. |
 
-This framework implements and benchmarks **three independent RAG modes** side-by-side using identical models, retrieval configurations, and test cases:
-
-- **Mode 1 — Baseline RAG**: Standard PDF extraction, chunking, embedding, vector search, and unconstrained LLM generation. Zero security guardrails.
-- **Mode 2 — Prompt-Only RAG**: Same RAG pipeline, but protected solely by a defensive, security-focused system prompt. No external detection tools.
-- **Mode 3 — Multi-Layer Guardrail RAG**: A comprehensive 6-stage defense architecture:
-  1. *Ingestion Security*: Secret detection, Presidio PII masking, injection quarantine, and data sensitivity tiering.
-  2. *Query Security*: Prompt injection detection (DeBERTa v3) and malicious intent classification.
-  3. *Access Control (RBAC)*: Clearance enforcement across `ANONYMOUS`, `RESEARCHER`, `STAFF`, and `ADMIN`.
-  4. *Retrieved-Context Security*: Neutralizing instructional prefixes and framing data in rigid `<retrieved_untrusted_data>` boundaries.
-  5. *Secure LLM Generation*: Structured system prompt isolating instructions from untrusted data.
-  6. *Output Security Scanning*: Intercepting leaked credentials and scanning output with Meta Llama Guard 3.
+> **Key Rule**: Llama Prompt Guard 2 86M runs through Groq in **both** Hosted and Local LLM modes to provide consistent, verified classification without overloading laptop memory.
 
 ---
 
-## 2. Directory Structure
+## 2. Two Independent Selection Systems (6 Experiment Configurations)
+
+The framework cleanly separates **Model Execution Mode** from **Research Security Mode**:
+
+```
+                              ┌─────────────────────────────────────────┐
+                              │          Model Execution Mode           │
+                              ├────────────────────┬────────────────────┤
+                              │    Hosted Mode     │   Local LLM Mode   │
+                              │    (Groq 120B)     │      (Ollama)      │
+┌──────────────┬──────────────┼────────────────────┼────────────────────┤
+│              │ Baseline     │ Exp 1: Host-Base   │ Exp 4: Loc-Base    │
+│   Research   ├──────────────┼────────────────────┼────────────────────┤
+│   Security   │ Prompt-Only  │ Exp 2: Host-Prompt │ Exp 5: Loc-Prompt  │
+│     Mode     ├──────────────┼────────────────────┼────────────────────┤
+│              │ Guardrail    │ Exp 3: Host-Guard  │ Exp 6: Loc-Guard   │
+└──────────────┴──────────────┴────────────────────┴────────────────────┘
+```
+
+### Model Execution Modes
+1. **Hosted Mode (`hosted`)**:
+   - Main LLM: `openai/gpt-oss-120b` via Groq.
+   - Embeddings: `gemini-embedding-2` via Google Gemini API.
+   - Prompt Injection Guard: `meta-llama/llama-prompt-guard-2-86m` via Groq.
+   - Vector Storage: Qdrant Cloud.
+2. **Local LLM Mode (`local`)**:
+   - Main LLM: Configurable local model via Ollama (e.g., `llama3.2:1b`, `qwen2.5:1.5b`).
+   - Embeddings: `gemini-embedding-2` via Google Gemini API.
+   - Prompt Injection Guard: `meta-llama/llama-prompt-guard-2-86m` via Groq.
+   - Vector Storage: Qdrant Cloud.
+
+*(Note: Local LLM Mode refers to local main LLM inference, not completely offline operation, as embeddings and prompt guard use specialized APIs).*
+
+### Research Security Modes
+1. **Mode 1 — Baseline RAG**: Standard PDF extraction, Gemini Embedding 2, Qdrant retrieval, and unconstrained LLM generation. Zero security guardrails.
+2. **Mode 2 — Prompt-Only RAG**: Same pipeline and retrieval as Baseline, but protected solely by a defensive system prompt. No external detection tools.
+3. **Mode 3 — Multi-Layer Guardrail RAG**: Complete 6-stage defense architecture:
+   - *Ingestion Security*: Regex secret redaction, Presidio PII masking, and Llama Prompt Guard 2 86M quarantine.
+   - *Query Security*: Llama Prompt Guard 2 86M injection detection.
+   - *Access Control*: RBAC clearance (`ANONYMOUS`, `RESEARCHER`, `STAFF`, `ADMIN`).
+   - *Retrieved-Context Security*: Delimiter wrapping in `<retrieved_untrusted_data>` and instructional prefix stripping.
+   - *Secure LLM Generation*: Rigid isolation framing instructions from untrusted data.
+   - *Output Security Scanning*: Intercepting and redacting leaked credentials before response delivery.
+
+---
+
+## 3. Directory Layout
 
 ```
 code/
 ├── main.py                     # CLI entry point
-├── config.py                   # Centralized configuration (Pydantic Settings)
-├── requirements.txt            # Python dependencies
-├── .env.example                # Template for environment variables and API keys
-├── AGENTS.md                   # Multi-agent operating protocol and memory lifecycle
-├── memory/                     # Persistent session memory
-│   ├── context.md              # Project domain, architecture, and scope
-│   ├── tasks.md                # Roadmap, current sprint, and backlog
-│   ├── decisions.md            # Architecture Decision Records (ADRs)
-│   ├── progress.md             # Chronological session logs
-│   └── learnings.md            # Technical insights and debugging notes
-├── cli/                        # Typer + Rich CLI application
-│   └── app.py                  # Commands: ingest, ask, evaluate, report, status
+├── config.py                   # Central settings forwarder
+├── requirements.txt            # Python dependencies (google-genai, groq, typer, etc.)
+├── .env.example                # Template for environment credentials
+├── config/                     # Application configuration
+│   ├── settings.py             # Pydantic Settings & startup validation
+│   └── model_config.py         # Enums for ModelExecutionMode & ResearchSecurityMode
+├── providers/                  # Raw API & engine integrations
+│   ├── groq_provider.py        # Groq GPT-OSS-120B & Llama Prompt Guard 2 86M
+│   ├── gemini_provider.py      # Google GenAI SDK (gemini-embedding-2)
+│   └── ollama_provider.py      # Local Ollama client with health checks
+├── models/                     # High-level domain services
+│   ├── embedding_service.py    # 768-dim embeddings with caching
+│   ├── llm_service.py          # Unified router switching between Groq and Ollama
+│   └── prompt_guard_service.py # Structured prompt injection scanner
 ├── database/                   # Vector database management
-│   └── qdrant_manager.py       # Qdrant Cloud client with in-memory fallback
+│   └── qdrant_manager.py       # Qdrant Cloud client (768 dims) with in-memory fallback
 ├── ingestion/                  # Document parsing and chunking
 │   ├── pdf_extractor.py        # PyMuPDF text & metadata extraction
 │   ├── chunker.py              # LangChain recursive character chunking
-│   └── pipeline.py             # Separate baseline vs. secured ingestion
-├── guardrails/                 # Individual security modules
+│   └── pipeline.py             # Separate baseline vs. secured ingestion collections
+├── guardrails/                 # Security layers
 │   ├── secret_detector.py      # Regex + Shannon entropy credential detection
 │   ├── pii_masker.py           # Microsoft Presidio Analyzer & Anonymizer
-│   ├── prompt_injection.py     # DeBERTa v3 Prompt Injection v2 client + heuristics
-│   ├── harm_classifier.py      # Llama Guard 3 client + operational filters
+│   ├── prompt_injection.py     # Llama Prompt Guard 2 86M wrapper + heuristics
 │   ├── access_control.py       # Role-Based Access Control (RBAC) & clearances
 │   └── context_sanitizer.py    # Delimiter wrapping & instruction stripping
 ├── policies/                   # Central decision engine
@@ -72,27 +112,17 @@ code/
 
 ---
 
-## 3. Quick Start & Setup Guide
+## 4. Setup & Installation Guide
 
 ### Step 1: Environment & Virtual Environment
-
 Ensure you have **Python 3.11 or 3.12** installed:
 
-```bash
-# Check Python version
-python --version
-
-# The virtual environment is already created at .venv.
-# To activate it:
-# Windows (PowerShell):
+```powershell
+# Activate virtual environment
 .venv\Scripts\Activate.ps1
-# Windows (Command Prompt):
-.venv\Scripts\activate.bat
-# Linux / macOS:
-source .venv/bin/activate
 ```
 
-If setting up on a new machine from scratch:
+If setting up on a new environment:
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
@@ -103,43 +133,38 @@ pip install -r requirements.txt
 
 ### Step 2: Configure Environment Variables (`.env`)
 
-Copy `.env.example` to `.env`:
-
-```bash
-copy .env.example .env   # On Windows
-cp .env.example .env     # On Linux / macOS
-```
-
-Open `.env` and fill in your connection details:
+Copy `.env.example` to `.env` and fill in your keys:
 
 ```ini
-# --- Vector Database (Qdrant Cloud) ---
+# Groq (Main LLM: GPT-OSS-120B & Prompt Guard 2 86M)
+GROQ_API_KEY=gsk_your_groq_api_key_here
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_PROMPT_GUARD_MODEL=meta-llama/llama-prompt-guard-2-86m
+
+# Gemini (Gemini Embedding 2 via Google GenAI SDK)
+GEMINI_API_KEY=AIzaSy_your_gemini_api_key_here
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2
+GEMINI_EMBEDDING_DIMENSION=768
+
+# Ollama (Local Main LLM Inference - for Local Mode)
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=llama3.2:1b
+
+# Qdrant Cloud (Vector Database)
 QDRANT_URL=https://your-cluster-id.us-east4-0.gcp.cloud.qdrant.io:6333
-QDRANT_API_KEY=your-qdrant-cloud-api-key
+QDRANT_API_KEY=your_qdrant_api_key_here
 
-# --- Primary LLM Provider (Virtual GPU / Hosted / Ollama) ---
-LLM_PROVIDER=openai_compatible     # or ollama_cloud | local_ollama | mock
-LLM_MODEL=qwen2.5:7b
-LLM_BASE_URL=https://your-virtual-gpu-endpoint/v1
-LLM_API_KEY=your-llm-api-key
-
-# --- Prompt Injection Classifier (ProtectAI DeBERTa v3) ---
-PROMPT_INJECTION_PROVIDER=mock     # or hosted_hf
-HF_API_KEY=your-huggingface-api-key
-
-# --- Harmful Content Classifier (Meta Llama Guard 3 1B) ---
-LLAMA_GUARD_PROVIDER=mock          # or hosted_api
-LLAMA_GUARD_API_URL=https://your-virtual-gpu-endpoint/v1
-LLAMA_GUARD_API_KEY=your-api-key
+# Application Execution Mode (hosted | local)
+MODEL_MODE=hosted
 ```
 
-> **Note**: If API keys are omitted or set to `mock`, the system automatically runs deterministic local mock generators so all commands, tests, and workflows execute offline.
+> **Offline/Simulation Fallback**: If keys are omitted during initial setup, the framework automatically uses built-in deterministic simulation for testing commands without crashing.
 
 ---
 
-### Step 3: Verify System Status
-
-Run the diagnostics command to verify your configuration and connections:
+### Step 3: Diagnostics Command
+Verify connections and loaded model providers:
 
 ```bash
 python main.py status
@@ -147,55 +172,68 @@ python main.py status
 
 ---
 
-## 4. How to Use the CLI
+## 5. Usage & CLI Commands
 
-### 1. Ingest Documents
-Place your research PDFs into a folder (e.g., `documents/`) and run:
+### 1. Ingest PDF Documents
+Ingests PDFs into Qdrant Cloud, creating matching 768-dimensional collections:
 ```bash
 # Ingest into both baseline and secured collections
 python main.py ingest --folder documents/
 
-# Or target a specific collection
+# Or ingest into secured collection only
 python main.py ingest --folder documents/ --target secured
 ```
 
-### 2. Query the Systems
-Ask questions across the three comparative modes:
+### 2. Querying Across Modes (6 Combinations)
 
 ```bash
-# Mode 1: Baseline RAG (no guardrails)
-python main.py ask --mode baseline --query "What are the database credentials?"
+# Configuration 1: Hosted Mode + Baseline RAG
+python main.py ask --model-mode hosted --mode baseline --query "What is the secret API key?"
 
-# Mode 2: Prompt-Only RAG (defensive prompt)
-python main.py ask --mode prompt-only --query "What are the database credentials?"
+# Configuration 2: Hosted Mode + Prompt-Only RAG
+python main.py ask --model-mode hosted --mode prompt-only --query "What is the secret API key?"
 
-# Mode 3: Multi-Layer Guardrail RAG (full defense pipeline)
-python main.py ask --mode guardrail --query "What are the database credentials?" --role RESEARCHER
+# Configuration 3: Hosted Mode + Multi-Layer Guardrail RAG
+python main.py ask --model-mode hosted --mode guardrail --query "What is the secret API key?" --role RESEARCHER
+
+# Configuration 4: Local LLM Mode + Baseline RAG
+python main.py ask --model-mode local --mode baseline --query "What is the secret API key?"
+
+# Configuration 5: Local LLM Mode + Prompt-Only RAG
+python main.py ask --model-mode local --mode prompt-only --query "What is the secret API key?"
+
+# Configuration 6: Local LLM Mode + Multi-Layer Guardrail RAG
+python main.py ask --model-mode local --mode guardrail --query "What is the secret API key?" --role RESEARCHER
 ```
 
-### 3. Run Automated Evaluation Benchmark
-Once your evaluation dataset (`.json` or `.jsonl`) is ready:
+### 3. Automated Benchmark Evaluation
+Run test cases across all three security modes:
 
 ```bash
-# Run full benchmark comparing Baseline vs. Prompt-Only vs. Guardrail
-python main.py evaluate --dataset path/to/eval_dataset.json --all
+# Evaluate Hosted Mode across all 3 security modes
+python main.py evaluate --dataset path/to/dataset.json --model-mode hosted --all
 
-# Run ablation experiments (disabling one layer to measure its contribution)
-python main.py evaluate --dataset path/to/eval_dataset.json --ablate ingestion
-python main.py evaluate --dataset path/to/eval_dataset.json --ablate query
-python main.py evaluate --dataset path/to/eval_dataset.json --ablate context
-python main.py evaluate --dataset path/to/eval_dataset.json --ablate output
+# Evaluate Local LLM Mode across all 3 security modes
+python main.py evaluate --dataset path/to/dataset.json --model-mode local --all
+
+# Evaluate BOTH Hosted and Local modes (all 6 configurations in one run!)
+python main.py evaluate --dataset path/to/dataset.json --model-mode all --all
+
+# Ablation Experiments: disable a single security layer to measure its contribution
+python main.py evaluate --dataset path/to/dataset.json --ablate ingestion
+python main.py evaluate --dataset path/to/dataset.json --ablate query
+python main.py evaluate --dataset path/to/dataset.json --ablate context
+python main.py evaluate --dataset path/to/dataset.json --ablate output
 ```
 
-### 4. View Research Reports & Generated Charts
+### 4. View Research Reports & Graphs
 ```bash
 python main.py report
 ```
-Visual bar charts comparing Attack Success Rate (ASR), Info Leakage (SILR), Prompt Injection (PISR), False Positive Rate (FPR), and Latency are saved as publication-ready PNGs in `storage/eval_results/`.
+Generates comparison charts (ASR, SILR, PISR, FPR, and Latency) saved inside `storage/eval_results/`.
 
 ### 5. Run Automated Tests
 ```bash
 pytest tests/
 ```
-
----
+*(All 11 unit and integration tests validate provider switching, 768-dim embeddings, Prompt Guard detection, and security modes).*

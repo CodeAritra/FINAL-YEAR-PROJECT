@@ -28,8 +28,8 @@ class QdrantManager:
         self.api_key = api_key or settings.qdrant_api_key
         self.in_memory = in_memory
 
-        if self.in_memory:
-            logger.info("Initializing in-memory Qdrant client (test mode).")
+        if self.in_memory or "your-cluster-id" in self.url or "placeholder" in (self.api_key or ""):
+            logger.info("Initializing in-memory Qdrant client (local/test mode).")
             self.client = QdrantClient(location=":memory:")
         elif self.api_key and "cloud.qdrant.io" in self.url:
             logger.info(f"Connecting to Qdrant Cloud at {self.url}.")
@@ -57,18 +57,20 @@ class QdrantManager:
     def ensure_collection(
         self,
         collection_name: str,
-        vector_size: int = 384,
+        vector_size: int | None = None,
         distance: models.Distance = models.Distance.COSINE,
+        recreate_if_mismatch: bool = False,
     ) -> bool:
-        """Create collection if it does not already exist."""
+        """Create collection if it does not already exist with matching vector dimension."""
+        size = vector_size or settings.gemini_embedding_dimension
         try:
             collections = self.client.get_collections().collections
             exists = any(c.name == collection_name for c in collections)
             if not exists:
-                logger.info(f"Creating collection '{collection_name}' with size {vector_size}.")
+                logger.info(f"Creating collection '{collection_name}' with dimension {size}.")
                 self.client.create_collection(
                     collection_name=collection_name,
-                    vectors_config=models.VectorParams(size=vector_size, distance=distance),
+                    vectors_config=models.VectorParams(size=size, distance=distance),
                 )
             return True
         except Exception as e:
@@ -117,22 +119,33 @@ class QdrantManager:
         score_threshold: float | None = None,
         filter_conditions: models.Filter | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform semantic similarity search."""
+        """Perform semantic similarity search using modern query_points API."""
         try:
-            results = self.client.search(
-                collection_name=collection_name,
-                query_vector=query_vector,
-                limit=limit,
-                score_threshold=score_threshold,
-                query_filter=filter_conditions,
-            )
+            if hasattr(self.client, "query_points"):
+                results = self.client.query_points(
+                    collection_name=collection_name,
+                    query=query_vector,
+                    limit=limit,
+                    score_threshold=score_threshold,
+                    query_filter=filter_conditions,
+                )
+                hits = results.points
+            else:
+                hits = self.client.search(
+                    collection_name=collection_name,
+                    query_vector=query_vector,
+                    limit=limit,
+                    score_threshold=score_threshold,
+                    query_filter=filter_conditions,
+                )
+
             return [
                 {
                     "id": hit.id,
                     "score": hit.score,
                     "payload": hit.payload or {},
                 }
-                for hit in results
+                for hit in hits
             ]
         except Exception as e:
             logger.error(f"Search failed in collection '{collection_name}': {e}")

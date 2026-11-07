@@ -1,12 +1,12 @@
 """
 Mode 3: Multi-Layer Guardrail RAG System.
 Executes end-to-end multi-stage security pipeline:
-1. Ingestion security (isolated in secured collection).
-2. Query security scanning (injection & harm check).
-3. Access control & authorization.
-4. Retrieved-context sanitization & untrusted delimiter framing.
-5. Secure LLM generation.
-6. Output security scanning (secret interception & harm classification).
+1. Ingestion security (isolated in secured collection with secret redaction and Presidio PII masking).
+2. Query security scanning (Llama Prompt Guard 2 86M via Groq).
+3. Access control & authorization (RBAC).
+4. Retrieved-context sanitization & untrusted delimiter framing (<retrieved_untrusted_data>).
+5. Secure LLM generation (supports Hosted GPT-OSS-120B and Local Ollama).
+6. Output security scanning (secret leak interception & redaction).
 """
 
 import time
@@ -18,7 +18,7 @@ from rag.pipeline import RAGRetrievalPipeline
 from rag.llm_client import LLMClient
 from policies.engine import PolicyEngine, PolicyDecision
 from guardrails.access_control import UserRole, DataSensitivity
-from config import settings
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +42,13 @@ class GuardrailRAG:
         llm_client: LLMClient | None = None,
         policy_engine: PolicyEngine | None = None,
         collection_name: str | None = None,
+        default_model_mode: str | None = None,
     ):
         self.retrieval = retrieval_pipeline or RAGRetrievalPipeline()
         self.llm = llm_client or LLMClient()
         self.policy_engine = policy_engine or PolicyEngine()
         self.collection_name = collection_name or settings.qdrant_collection_secured
+        self.default_model_mode = default_model_mode or settings.model_mode
 
     def run(
         self,
@@ -54,16 +56,20 @@ class GuardrailRAG:
         user_role: UserRole = UserRole.RESEARCHER,
         target_sensitivity: DataSensitivity = DataSensitivity.INTERNAL,
         top_k: int = 4,
+        model_mode: str | None = None,
     ) -> ModeExecutionResult:
         """Execute full multi-layer guardrail RAG query cycle."""
         total_start = time.perf_counter()
+        active_model_mode = (model_mode or self.default_model_mode).lower().strip()
+
         security_meta: dict[str, Any] = {
             "guardrails_applied": True,
             "policy_decisions": {},
             "stage_latencies_ms": {},
+            "model_mode": active_model_mode,
         }
 
-        # Stage 1: User Query Security & Authorization Check
+        # Stage 1: User Query Security (Llama Prompt Guard 2 86M) & Authorization Check (RBAC)
         q_start = time.perf_counter()
         query_eval = self.policy_engine.evaluate_query(
             query=query,
@@ -78,6 +84,8 @@ class GuardrailRAG:
             total_latency = (time.perf_counter() - total_start) * 1000
             return ModeExecutionResult(
                 mode="guardrail",
+                model_mode=active_model_mode,
+                model_name="N/A (Blocked by Input Guardrail)",
                 query=query,
                 response=f"[GUARDRAIL BLOCK] {query_eval.reason}",
                 retrieved_snippets=[],
@@ -104,7 +112,7 @@ class GuardrailRAG:
         ctx_latency = (time.perf_counter() - ctx_start) * 1000
         security_meta["stage_latencies_ms"]["context_guard"] = ctx_latency
 
-        # Stage 4: Secure LLM Generation
+        # Stage 4: Secure LLM Generation (Groq GPT-OSS-120B in Hosted, Ollama in Local)
         gen_start = time.perf_counter()
         user_prompt = (
             f"Retrieved Context:\n{framed_context}\n\n"
@@ -115,12 +123,14 @@ class GuardrailRAG:
         llm_resp = self.llm.generate(
             prompt=user_prompt,
             system_prompt=self.SECURE_SYSTEM_PROMPT,
+            mode=active_model_mode,
         )
         gen_latency = (time.perf_counter() - gen_start) * 1000
         security_meta["stage_latencies_ms"]["generation"] = gen_latency
         security_meta["tokens_used"] = llm_resp.tokens_used
+        security_meta["model_provider"] = llm_resp.provider
 
-        # Stage 5: Output Security Scanning (Secret Interception & Llama Guard)
+        # Stage 5: Output Security Scanning (Secret Interception & Redaction)
         out_start = time.perf_counter()
         output_eval = self.policy_engine.evaluate_output(llm_resp.content)
         out_latency = (time.perf_counter() - out_start) * 1000
@@ -136,6 +146,8 @@ class GuardrailRAG:
 
         return ModeExecutionResult(
             mode="guardrail",
+            model_mode=active_model_mode,
+            model_name=llm_resp.model,
             query=query,
             response=final_answer,
             retrieved_snippets=snippets,
@@ -144,4 +156,3 @@ class GuardrailRAG:
             latency_total_ms=total_latency,
             security_metadata=security_meta,
         )
-

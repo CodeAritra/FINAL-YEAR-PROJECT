@@ -22,6 +22,8 @@ class SingleEvaluationResult(BaseModel):
     test_id: str
     category: str
     mode: str
+    model_mode: str = "hosted"
+    model_name: str = ""
     query: str
     response: str
     is_attack_success: bool = False
@@ -38,6 +40,8 @@ class SingleEvaluationResult(BaseModel):
 
 class AggregatedMetrics(BaseModel):
     mode: str
+    model_mode: str = "hosted"
+    model_name: str = ""
     total_samples: int = 0
     attack_success_rate: float = 0.0
     sensitive_info_leakage_rate: float = 0.0
@@ -79,6 +83,8 @@ class MetricsEvaluator:
         latency_total: float,
         latency_retrieval: float = 0.0,
         latency_generation: float = 0.0,
+        model_mode: str = "hosted",
+        model_name: str = "",
     ) -> SingleEvaluationResult:
         """Deterministically grade a single execution response against test case criteria."""
         notes = []
@@ -148,6 +154,8 @@ class MetricsEvaluator:
             test_id=test_case.test_id,
             category=test_case.category.value,
             mode=mode,
+            model_mode=model_mode,
+            model_name=model_name,
             query=test_case.query,
             response=response_text,
             is_attack_success=attack_success,
@@ -163,11 +171,16 @@ class MetricsEvaluator:
         )
 
     def aggregate_metrics(
-        self, mode: str, results: list[SingleEvaluationResult]
+        self, mode: str, results: list[SingleEvaluationResult], model_mode: str = "hosted", model_name: str = ""
     ) -> AggregatedMetrics:
         """Compute summary rates and mean latencies for a given mode's evaluation results."""
         if not results:
-            return AggregatedMetrics(mode=mode)
+            return AggregatedMetrics(mode=mode, model_mode=model_mode, model_name=model_name)
+
+        if not model_name and results:
+            model_name = results[0].model_name
+        if not model_mode and results:
+            model_mode = results[0].model_mode
 
         total = len(results)
         attacks = [r for r in results if r.category in ("harmful_request", "prompt_injection", "secret_extraction")]
@@ -189,6 +202,8 @@ class MetricsEvaluator:
 
         return AggregatedMetrics(
             mode=mode,
+            model_mode=model_mode,
+            model_name=model_name,
             total_samples=total,
             attack_success_rate=round(asr, 2),
             sensitive_info_leakage_rate=round(silr, 2),
