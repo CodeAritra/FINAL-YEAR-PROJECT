@@ -71,3 +71,41 @@ This document maintains a chronological record of sessions, deliverables complet
   - Created combined 25-sample benchmark suite: `evaluation/datasets/full_evaluation_benchmark.json`.
   - Verified dataset integrity with `DatasetLoader` (25/25 valid schema records).
 - **Next Steps**: Ingest PDFs via `python main.py ingest --folder documents/` and execute automated benchmark comparison via `python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --all`.
+
+
+### Session 006: 2026-11-07
+- **Goal**: Resolve Groq 429 rate limit errors without heuristic fallback, and provide a database cleanup and reset utility for Qdrant.
+- **Completed**:
+  - Fixed Google GenAI SDK v2 `EmbedContentResponse` attribute mapping in `providers/gemini_provider.py` (`embeddings[0].values`).
+  - Enhanced `providers/groq_provider.py` with `_extract_retry_delay` parsing `Retry-After`, `x-ratelimit-reset-*`, and JSON error body durations.
+  - Implemented 429 retry backoff loop in both `check_prompt_injection` and `generate`, ensuring the system waits and retries without prematurely falling back to heuristics.
+  - Created [`scripts/clean_qdrant.py`](../scripts/clean_qdrant.py) supporting selective or complete collection purges with point counts and automatic empty collection recreation.
+  - Added `python main.py clean` Typer command to `cli/app.py`.
+  - Documented clean command options in root [`README.md`](../README.md).
+  - Recorded LRN-002 and LRN-003 in `memory/learnings.md`.
+
+
+### Session 007: 2026-11-08
+- **Goal**: Implement pre-chunking document inspection and sanitization export (`python main.py inspect`), fix conversational refusal regex matching in metrics evaluator, and provide live real-time test progress during evaluation runs.
+- **Completed**:
+  - Created [`ingestion/inspector.py`](../ingestion/inspector.py) extracting full text from PDFs, applying Secret Redaction and PII Masking, and generating structured `.txt` exports.
+  - Added `python main.py inspect --folder documents/` CLI command to [`cli/app.py`](../cli/app.py).
+  - Wired auto-export into [`ingestion/pipeline.py`](../ingestion/pipeline.py) so ingestion keeps `storage/processed_docs/` synchronized.
+  - Enhanced [`evaluation/metrics.py`](../evaluation/metrics.py) refusal regex (`REFUSAL_PHRASES`) to accurately capture conversational contractions (`can't|can’t`), apologetic openers (`I'm sorry, but`), and verb variants (`help`).
+  - Upgraded [`evaluation/evaluator.py`](../evaluation/evaluator.py) with live, per-sample terminal status logging showing progress counter `(XX/YY)`, mode badge, test ID, query preview, status badge (`[REFUSED / PROTECTED]`, `[ATTACK SUCCEEDED]`, `[SECRET LEAKED]`), and latency in ms.
+  - Re-scored and regenerated all benchmark results in `storage/eval_results/`.
+  - Added `--limit` / `-n` option to `python main.py evaluate` and set default dataset to `full_evaluation_benchmark.json`.
+
+
+### Session 008: 2026-11-08
+- **Goal**: Prepare benchmark expansion infrastructure, implement subset sampling flags (`--target` and `--sample 10/50/all`), build dataset management utilities (`scripts/build_dataset.py`), and synchronize all documentation and test suites.
+- **Completed**:
+  - Implemented `--target` (`forensics`, `company`, `all`) and balanced `--sample` (`10`, `50`, `all`) in [`cli/app.py`](../cli/app.py) with automatic 50/50 answerable vs. unanswerable balancing and fallback warnings for unexpanded sets.
+  - Built [`scripts/build_dataset.py`](../scripts/build_dataset.py) CLI providing `stats` (table breakdown across all benchmark files), `validate` (integrity & schema validator), and `merge` (combines Forensics + Company into `full_200_benchmark.json`).
+  - Added unit test suite [`tests/test_dataset_builder.py`](../tests/test_dataset_builder.py) verifying test case factories and validation logic (13/13 unit tests passing).
+  - Synchronized root [`README.md`](../README.md) with comprehensive documentation for `--target`, `--sample`, dataset management tools, and live progress indicators.
+  - Memory synchronized; system completely prepared for user's question set ingestion.
+
+
+
+

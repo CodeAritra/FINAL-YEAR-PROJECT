@@ -9,8 +9,10 @@ from pathlib import Path
 from datetime import datetime
 import json
 import csv
+import time
 import logging
 from pydantic import BaseModel, Field
+from rich.console import Console
 
 from evaluation.test_case import EvaluationTestCase, DatasetLoader
 from evaluation.metrics import MetricsEvaluator, SingleEvaluationResult, AggregatedMetrics
@@ -22,6 +24,7 @@ from guardrails.access_control import UserRole, DataSensitivity
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 
 class EvaluationRunReport(BaseModel):
@@ -80,15 +83,22 @@ class EvaluationRunner:
         exec_modes = ["hosted", "local"] if model_mode == "all" else [model_mode]
 
         evaluated_mode_keys = []
+        total_evaluations = len(exec_modes) * len(modes) * len(test_cases)
+        completed_count = 0
 
         for m_mode in exec_modes:
-            for test_case in test_cases:
-                logger.info(f"Evaluating {test_case.test_id} [{test_case.category.value}] in {m_mode} mode...")
-                for mode_name, system in modes:
-                    composite_key = f"{mode_name} ({m_mode})"
-                    if composite_key not in evaluated_mode_keys:
-                        evaluated_mode_keys.append(composite_key)
+            for mode_name, system in modes:
+                composite_key = f"{mode_name} ({m_mode})"
+                if composite_key not in evaluated_mode_keys:
+                    evaluated_mode_keys.append(composite_key)
 
+                console.print(
+                    f"\n[bold magenta]>> Evaluating Mode: [cyan]{mode_name.upper()}[/cyan] "
+                    f"([yellow]{m_mode.upper()}[/yellow]) | {len(test_cases)} Test Cases[/bold magenta]"
+                )
+
+                for tc_idx, test_case in enumerate(test_cases, 1):
+                    completed_count += 1
                     try:
                         if mode_name == "guardrail":
                             role = UserRole(test_case.user_role.upper())
@@ -115,6 +125,34 @@ class EvaluationRunner:
                         )
                         all_results.append(graded)
 
+                        # Determine status badge for live terminal reporting
+                        if graded.is_correct_refusal:
+                            status_badge = "[bold green][REFUSED / PROTECTED][/bold green]"
+                        elif graded.is_secret_leaked:
+                            status_badge = "[bold red][SECRET LEAKED][/bold red]"
+                        elif graded.is_attack_success:
+                            status_badge = "[bold red][ATTACK SUCCEEDED][/bold red]"
+                        elif graded.is_safe_accurate_answer:
+                            status_badge = "[bold green][SAFE ANSWER][/bold green]"
+                        elif graded.is_false_positive:
+                            status_badge = "[bold yellow][FALSE POSITIVE][/bold yellow]"
+                        else:
+                            status_badge = "[bold cyan][COMPLETED][/bold cyan]"
+
+                        query_preview = test_case.query[:38] + ("..." if len(test_case.query) > 38 else "")
+                        console.print(
+                            f"  [dim]({completed_count:02d}/{total_evaluations:02d})[/dim] "
+                            f"[cyan][{mode_name.upper():11s}][/cyan] "
+                            f"[{tc_idx:02d}/{len(test_cases):02d}] "
+                            f"[bold white]{test_case.test_id:12s}[/bold white] "
+                            f"\"{query_preview}\" -> {status_badge} "
+                            f"[dim]({res.latency_total_ms:.0f}ms)[/dim]"
+                        )
+
+                        # Gentle pacing in hosted mode for LLM generation
+                        if m_mode == "hosted" and mode_name != "guardrail":
+                            time.sleep(1.0)
+
                     except Exception as e:
                         logger.error(f"Error evaluating {test_case.test_id} on {mode_name} ({m_mode}): {e}")
                         failed_res = SingleEvaluationResult(
@@ -128,6 +166,10 @@ class EvaluationRunner:
                             evaluation_notes=[f"Exception occurred: {e}"],
                         )
                         all_results.append(failed_res)
+                        console.print(
+                            f"  [red]({completed_count:02d}/{total_evaluations:02d}) [{mode_name.upper()}] "
+                            f"[{tc_idx:02d}/{len(test_cases):02d}] {test_case.test_id} -> [FAILED: {e}][/red]"
+                        )
 
         # Compute Aggregated Metrics by composite key (mode + model_mode)
         metrics_by_mode: dict[str, AggregatedMetrics] = {}

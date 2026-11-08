@@ -101,7 +101,14 @@ code/
 ├── ingestion/                  # Document parsing and chunking
 │   ├── pdf_extractor.py        # PyMuPDF text & metadata extraction
 │   ├── chunker.py              # LangChain recursive character chunking
+│   ├── inspector.py            # Pre-chunking extraction & sanitization exporter (.txt)
 │   └── pipeline.py             # Separate baseline vs. secured ingestion collections
+├── scripts/                    # Standalone administration utilities
+│   ├── clean_qdrant.py         # Qdrant collection purge and reset tool
+│   └── build_dataset.py        # Benchmark dataset validator, statistics & merge tool
+├── storage/                    # Persistent runtime artifacts
+│   ├── processed_docs/         # Sanitized document exports (one .txt per PDF)
+│   └── eval_results/           # Benchmark reports (.jsonl, .csv, and .png comparison charts)
 ├── guardrails/                 # Security layers
 │   ├── secret_detector.py      # Regex + Shannon entropy credential detection
 │   ├── pii_masker.py           # Microsoft Presidio Analyzer & Anonymizer
@@ -191,7 +198,37 @@ python main.py ingest --folder documents/
 python main.py ingest --folder documents/ --target secured
 ```
 
-### 2. Querying Across Modes (6 Combinations)
+### 2. Inspect Sanitized Documents (Pre-Chunking Audit)
+Extracts full text from PDFs, evaluates Secret Redaction and Presidio PII Masking, and exports one readable `.txt` file per PDF to `storage/processed_docs/`:
+```bash
+# Inspect and export sanitized text for all PDFs in documents/
+python main.py inspect --folder documents/
+
+# Output files generated in storage/processed_docs/:
+# - storage/processed_docs/company internal doc.txt (with AWS keys & DB URIs redacted)
+# - storage/processed_docs/forensics.txt
+```
+
+### 3. Clean / Reset Qdrant Database
+Purges points and resets vector collections (`baseline_rag`, `secured_rag`, or all collections) in Qdrant Cloud:
+```bash
+# Reset baseline and secured collections and recreate fresh empty collections
+python main.py clean
+
+# Or run the standalone cleanup script
+python scripts/clean_qdrant.py
+
+# Clean only baseline collection
+python main.py clean --target baseline
+
+# Clean without interactive confirmation prompt
+python main.py clean --force
+
+# Purge ALL collections in cluster (with immediate recreation)
+python scripts/clean_qdrant.py --all --recreate --force
+```
+
+### 4. Querying Across Modes (6 Combinations)
 
 ```bash
 # Configuration 1: Hosted Mode + Baseline RAG
@@ -213,37 +250,86 @@ python main.py ask --model-mode local --mode prompt-only --query "What is the se
 python main.py ask --model-mode local --mode guardrail --query "What is the secret API key?" --role RESEARCHER
 ```
 
-### 3. Automated Benchmark Evaluation
-Run test cases across all three security modes using the dedicated datasets:
+### 5. Automated Benchmark Evaluation
+Runs test cases across all three security modes with live real-time progress logging for every sample:
 
 ```bash
-# Benchmark using the 20-question Forensics Harm Dataset (Hosted Mode)
+# Evaluate 10 balanced questions (5 answerable, 5 unanswerable) on Forensics
+python main.py evaluate --target forensics --sample 10
+
+# Evaluate 50 balanced questions (25 answerable, 25 unanswerable) on Company Confidential document
+python main.py evaluate --target company --sample 50
+
+# Evaluate all questions across both documents (combined benchmark)
+python main.py evaluate --target all --sample all
+
+# Default evaluation (runs the active benchmark suite across all 3 security modes)
+python main.py evaluate
+
+# Quick evaluation on first N test cases
+python main.py evaluate --limit 5
+
+# Custom dataset override
 python main.py evaluate --dataset evaluation/datasets/forensics_benchmark.json --model-mode hosted --all
 
-# Benchmark using the Combined 25-Question Full Dataset (Hosted Mode)
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode hosted --all
-
 # Benchmark using Local LLM Mode (Ollama)
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode local --all
+python main.py evaluate --model-mode local --all
 
-# Benchmark BOTH Hosted and Local modes (all 6 configurations in one benchmark!)
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --model-mode all --all
+# Benchmark BOTH Hosted and Local modes (all 6 configurations in one run)
+python main.py evaluate --model-mode all --all
 
 # Ablation Experiments: disable a single security layer to measure its contribution
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate ingestion
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate query
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate context
-python main.py evaluate --dataset evaluation/datasets/full_evaluation_benchmark.json --ablate output
+python main.py evaluate --ablate ingestion
+python main.py evaluate --ablate query
+python main.py evaluate --ablate context
+python main.py evaluate --ablate output
 ```
 
-### 4. View Research Reports & Graphs
+#### Evaluation Flags Reference
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--target` | `-t` | `all` | Document dataset: `forensics`, `company`, or `all`. |
+| `--sample` | `-s` | `all` | Balanced sample size: `10` (5 ans / 5 unans), `50` (25 ans / 25 unans), or `all`. |
+| `--dataset`| `-d` | None | Direct path override to any custom `.json` or `.jsonl` benchmark file. |
+| `--model-mode` | `-M` | `hosted` | LLM execution mode: `hosted` (Groq 120B), `local` (Ollama), or `all` (both). |
+| `--all` | | `True` | Automatically runs across all 3 security modes (Baseline, Prompt-Only, Guardrail). |
+| `--limit` | `-n` | None | Limits evaluation to first N test cases. |
+| `--ablate`| | None | Ablation study: disables `ingestion`, `query`, `context`, or `output` layer. |
+
+Every run outputs:
+- **Live console progress**: Showing global progress `(XX/YY)`, mode badge, question preview, result status (`[REFUSED / PROTECTED]`, `[ATTACK SUCCEEDED]`, `[SECRET LEAKED]`, `[SAFE ANSWER]`), and exact latency in milliseconds.
+- **Excel-ready CSV**: Saved to `storage/eval_results/eval_run_<timestamp>.csv`
+- **JSONL Full Audit Trail**: Saved to `storage/eval_results/eval_run_<timestamp>.jsonl`
+- **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png`
+
+---
+
+### 6. Benchmark Dataset Management Utilities
+Inspect, validate, and merge dataset benchmark files:
+
+```bash
+# View summary table of all benchmark datasets (totals, answerable vs unanswerable breakdown)
+python scripts/build_dataset.py stats
+
+# Validate schema compliance and integrity of a specific benchmark file
+python scripts/build_dataset.py validate --path evaluation/datasets/full_evaluation_benchmark.json
+
+# Merge Forensics and Company datasets into a unified benchmark (full_200_benchmark.json)
+python scripts/build_dataset.py merge
+```
+
+---
+
+### 7. View Research Reports & Graphs
 ```bash
 python main.py report
 ```
-Generates comparison charts (ASR, SILR, PISR, FPR, and Latency) saved inside `storage/eval_results/`.
+Displays recent benchmark summaries and outputs the path to the latest comparison charts.
 
-### 5. Run Automated Tests
+---
+
+### 8. Run Automated Tests
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
-*(All 11 unit and integration tests validate provider switching, 768-dim embeddings, Prompt Guard detection, and security modes).*
+*(All 13 unit and integration tests validate provider routing, 768-dim embeddings, Prompt Guard rate-limiting, security modes, and dataset builder utilities).*

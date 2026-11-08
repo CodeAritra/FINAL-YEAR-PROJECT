@@ -75,8 +75,13 @@ class GeminiEmbeddingProvider:
                     config=config,
                 )
 
-                if response.embedding and response.embedding.values:
+                vec = None
+                if hasattr(response, "embeddings") and response.embeddings:
+                    vec = list(response.embeddings[0].values)
+                elif hasattr(response, "embedding") and response.embedding:
                     vec = list(response.embedding.values)
+
+                if vec is not None:
                     # Normalize vector
                     arr = np.array(vec)
                     norm = np.linalg.norm(arr)

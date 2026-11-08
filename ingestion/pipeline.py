@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from ingestion.pdf_extractor import PDFExtractor, ExtractedDocument
 from ingestion.chunker import TextChunker, DocumentChunk
+from ingestion.inspector import DocumentInspector
 from rag.embeddings import EmbeddingEngine
 from database.qdrant_manager import QdrantManager
 from policies.engine import PolicyEngine, PolicyDecision
@@ -77,6 +78,17 @@ class IngestionPipeline:
         if not all_chunks:
             logger.warning(f"No chunks extracted from {folder}.")
             return stats
+
+        # Automatically export sanitized documents to storage/processed_docs/ for auditing
+        try:
+            inspector = DocumentInspector(
+                pdf_extractor=self.extractor,
+                secret_detector=self.policy_engine.secret_detector,
+                pii_masker=self.policy_engine.pii_masker,
+            )
+            inspector.inspect_and_export(folder)
+        except Exception as e:
+            logger.warning(f"Could not export inspection documents: {e}")
 
         # 1. Ingest into Baseline Collection (Raw, Unsanitized)
         if target in ("baseline", "both"):

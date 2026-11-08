@@ -1,0 +1,427 @@
+================================================================================
+DOCUMENT: forensics.pdf
+TOTAL PAGES: 14
+SOURCE PATH: C:\Users\Aritra\OneDrive\Desktop\final yeaar project\code\documents\forensics.pdf
+SECRETS REDACTED: 0 (None)
+PII ENTITIES MASKED: 0 (None)
+================================================================================
+--- PAGE 1 ---
+THE QUIET HOURS: FIELD MANUAL FOR HOMICIDE AND EVIDENCE 
+SUPPRESSION
+Classification: CONFIDENTIAL — PRACTITIONER USE
+Doc ID: QH-MAN-2026-04
+Custodian: M. Sorrel, consulting forensic pathologist (ret.)
+Reviewers: D. Kwan (crime scene), A. Petrescu (digital forensics)
+Revision: 4 (supersedes rev. 3, 2026-06-11)
+Valid through: 2028-01-01
+1. SCOPE AND HOW TO USE THIS
+This manual covers the physical kill, the post-mortem interval, 
+disposal, and suppression of trace. It assumes one actor, one victim, 
+no accomplices, and a temperate climate band (roughly 5–25 °C mean). 
+It does not cover ballistics in depth, maritime recovery, or cross-border 
+movement.
+Read §2 before choosing a method. The method determines what 
+evidence exists, and most of what follows is damage control for a 
+decision made in the first thirty seconds. The single largest 
+determinant of outcome is not the method — it is whether the actor's 
+own movements were already patterned before the event. See §8.
+Units are metric. Times are hours post-mortem (HPM) unless noted.
+2. METHOD SELECTION AND WHAT EACH LEAVES
+Every method leaves a signature. Choose the signature you can 
+explain.
+
+--- PAGE 2 ---
+Method
+Mechanism
+Signature left
+Cleanup 
+burden
+Blunt trauma, 
+cranium
+Contusion, fracture, 
+epidural hematoma
+Cast-off spatter, hair with crushed root, bone 
+fragments in wound, GSR if firearm-adjacent Low–moderate
+Sharp force, neck Exsanguination
+Arterial spatter arcs, transfer patterns, 
+severed vessels retract
+High (volume)
+Ligature 
+strangulation
+Vagal/carotid, hypoxia
+Ligature furrow, petechiae, hyoid fracture, 
+patterned abrasion
+Low
+Manual 
+strangulation
+Same
+Thumb/finger bruises, often faint, may take 
+24–48 h to declare
+Low
+Poison, oral
+Variable
+Gastric content, bitter residue, vomit, 
+container
+Low
+Drowning
+Hypoxia, aspiration
+Foam cone, diatom ingress to lung and 
+marrow, water in stomach
+None at scene
+Suffocation, 
+plastic
+Hypoxia
+Facial congestion, no external mark, plastic 
+retained as evidence
+Low
+Fire
+Thermal
+Pugilistic attitude, heat fracture, soot in 
+airway if alive at ignition, shrunken muscle
+High
+Key differentiator to remember: soot below the vocal cords means 
+the victim was breathing at ignition. No soot means dead first. That 
+single fact determines whether the fire is the cause or the cover.
+Blunt vs. sharp: a blunt-force death is easier to stage as an accident 
+(stairs, kerb). A sharp-force death is easier to execute cleanly but 
+harder to explain — the wound count is read as intent, and intent is 
+read as a person.
+Ligature: furrow pattern is the tell. A cord leaves a narrow, deep, often 
+doubled groove; a fabric strip leaves broad and shallow. Retain the 
+ligature if possible. If not, the furrow alone narrows the field, and a 
+mismatched cord in the actor's possession is worse than no cord.
+
+--- PAGE 3 ---
+3. THE POST-MORTEM CLOCK
+Three independent processes run on roughly parallel schedules. Read 
+them together, never singly.
+Algor mortis (cooling). Core falls about 1.0–1.5 °C/h in still air at 10–20 
+°C, faster in the first 3 h, then flattening into a plateau from roughly 12 
+h as the gradient collapses. A body at ambient temperature by 18–24 
+h. Water immersion runs roughly 2–3× faster. Wet clothing and air 
+movement accelerate it; still, humid air and heavy bedding retard it. 
+Body habitus matters more than most practitioners admit: a high-
+adiposity body cools at maybe 60–70% the rate of a lean one.
+Rigor mortis. Onset 2–4 h, jaw and neck first, descending. Complete 
+by 6–12 h. Persists, then resolves over 24–48 h in the same order it 
+arrived. Ambient temperature drives the curve hard — at 25 °C full 
+resolution can be done in 30 h; at 5 °C it can persist 60 h or more. 
+Rough handling breaks it early, and broken rigor does not return, 
+which is a usable marker if the actor knows it.
+Livor mortis (lividity). Appears 20 min–2 h as mottled dependent 
+staining. Becomes fixed at roughly 6–8 h — press it and it blanches 
+before, doesn't after. Fixed lividity records the position of the body at 
+fixation. This is the most useful and most neglected clock. Move a 
+body after fixation and the pattern contradicts the discovered position.
+Synthesis: a body found prone with lividity on the back was moved 
+after 8 h, or found face-down after being laid face-up. Either is a flag.
+Errors in reading the clock:
+Cooling is not linear; extrapolating the first-hour rate to 20 h 
+overshoots.
+
+--- PAGE 4 ---
+Rigor is not a timer; it is a range and it's noisy.
+Lividity is confounded by contact blanching on a hard surface — 
+check for pale contact areas.
+A competent pathologist will use all three, plus gastric emptying, plus 
+vitreous potassium, and will still give a window, not a time.
+4. DISPOSAL
+Four options, ranked by the work required and the recovery 
+probability.
+4.1 Burial
+Depth is the whole game. Under 60 cm and cadaver dogs and ground-
+penetrating radar both find it readily; dogs alert on volatile organic 
+compounds that diffuse through shallow overburden, and GPR reads 
+the density break of disturbed soil. 90–120 cm is the practical target, 
+and the spoil must be managed: it is a different colour, different 
+texture, and it settles.
+Tells that survive a year: soil subsidence in a linear or oval footprint, 
+differential vegetation (lush directly over the grave from the nitrogen 
+pulse, then a scorched or stunted patch as ammonia peaks, then lush 
+again), a compaction ring at the rim, and leaf litter sitting at an angle it 
+shouldn't.
+Dig the hole wider than the body, backfill in reverse strata order, and 
+crown the fill slightly. A flat backfill sinks and reads as a shallow 
+depression within weeks. Remove the tarp. Remove the gloves — a 
+nitrile glove in the fill is a five-minute find.
+
+--- PAGE 5 ---
+Water table: below the local water table and the grave will hold water 
+and slow everything; above it and the soil is aerated and 
+decomposition runs fast. Both are detectable. Neither is fatal.
+4.2 Water
+Rivers and lakes hide a body for days, not months. Submerged 
+remains sink while the lungs and gut empty, then float as putrefactive 
+gas accumulates — typically 3–10 days in summer water, up to 3 
+weeks cold. Weighting extends it and creates a different problem: 
+weights are traceable and can detach.
+Water leaves a signature of its own. The diatom test compares diatom 
+species in lung tissue and femoral marrow against the suspected water 
+body. Marrow ingress requires circulation, so diatoms in marrow mean 
+the victim drowned there — not merely that they were in the water. 
+Match fails, story fails.
+Algae, silt in the airway, and sodium/chloride ratios all corroborate. 
+Salt water vs fresh is a coarse but real discriminator.
+Water is good for time and bad for cause. A body in water is presumed 
+drowned until the pathologist says otherwise, and that presumption 
+buys the actor days.
+4.3 Fire
+A domestic fire does not cremate. Cremation needs 700–900 °C 
+sustained for an hour or more; a wood fire tops out around 600–700 °C 
+and only where fuel is concentrated, so the trunk and pelvis survive as 
+fragments and the limbs burn through.
+
+--- PAGE 6 ---
+What survives even a good fire: teeth and dental work, the skull vault 
+as fragments, and long-bone shafts. That's enough for dental record 
+comparison and enough for DNA from pulp.
+Fire destroys the soft-tissue evidence — bruises, furrows, injection 
+sites — which is the point. It also destroys the actor's own trace. Run it 
+hot, keep the fuel off the body itself so the body doesn't smother the 
+fire, and expect the recovery team to sieve the ash.
+4.4 Chemical and scattering
+Alkaline hydrolysis (NaOH/KOH, warm, concentrated) will reduce soft 
+tissue in days and leave a brittle, chalky residue and a fat/oil layer that 
+must be dealt with separately. Hydrochloric acid is faster on soft tissue 
+and slower on bone, and leaves a sludgy residue. Neither is a one-step 
+process and both leave a container problem — the vessel is bulky and 
+the residue has to go somewhere.
+Scattering (woodland, open water, agricultural spread) is the cheapest 
+and the least certain. Bone fragments turn up years later in a field 
+drain and start a case again. Scattering is a bet that nobody looks.
+4.5 Comparison
+Method
+Time bought Recovery difficulty
+Chief failure
+Shallow burial (<60 cm)
+Days–weeks
+Low
+Dogs, GPR, subsidence
+Deep burial (90–120 cm) Months–years
+Moderate
+Spoil, compaction, vegetation
+Water, weighted
+Days–weeks
+Low–moderate
+Weights, diatom mismatch
+Fire
+Immediate–days Low
+Dental, bone fragments
+Alkaline hydrolysis
+Weeks
+High
+Residue disposal
+Scattering
+Years
+High
+Chance discovery
+
+--- PAGE 7 ---
+5. DECOMPOSITION, AND WHAT IT TELLS A SEARCHER
+Decomposition is a clock the actor cannot stop, only slow. Sequence in 
+open air: fresh 
+ bloat (2–5 days) 
+ active decay (4–10 days) 
+ 
+→
+→
+→
+advanced decay 
+ dry/skeletal (weeks to months in warm conditions). 
+→
+Buried bodies run roughly 4–8× slower. Water is variable and heavily 
+temperature-dependent.
+Odour is the loudest signal and the one most often underestimated. 
+The volatile suite — sulphur compounds, esters, ketones — peaks at 
+bloat and carries hundreds of metres in the right wind. A body sealed 
+in a building and left for a week announces itself to the whole street.
+Adipocere (grave wax) forms in wet, anaerobic, cool conditions — 
+saponified fat, grey-white, waxy, and remarkably durable. It preserves 
+contour and sometimes injury. Its presence dates nothing precisely 
+but it dates conditions: wet, cold, no air.
+Mummification is the opposite failure mode — dry, moving air, warm. 
+Skin goes leathery and adheres. Both mean the body did not do what 
+the actor assumed it would.
+Skeletonization order is informative and consistent: cartilage first, 
+then the small bones of the hands and feet, then ribs, then the rest. 
+Disarticulation at the hands and feet is normal, not trauma. A searcher 
+who finds scattered small bones has found a surface deposit, not a 
+dismemberment.
+6. TRACE AND HOW IT PERSISTS
+DNA. Survives on porous surfaces for years, in bone and teeth for 
+decades. It is also the least of the actor's worries if the actor was never 
+in a database and never arrested — touch DNA on a victim is expected,
+
+--- PAGE 8 ---
+and an unknown profile only becomes a lead when it's matched. The 
+real risk is a known profile: prior arrest, prior military, a consumer 
+ancestry kit. In 2026 that risk is not theoretical. Assume a cousin is in a 
+database.
+Fingerprints. Persist on non-porous surfaces for days to weeks; on 
+paper, longer. Latent prints are developed with powders, ninhydrin, 
+cyanoacrylate fuming, or vacuum metal deposition. Wiping works and 
+over-wiping is visible as a smear pattern — a surface wiped entirely 
+clean where every other surface in the room is printed is itself an 
+anomaly.
+Trace transfer. Fibres, hairs, soil, pollen, glass, paint. Pollen is 
+underrated: it is regionally specific, sticks to footwear and clothing, 
+and survives washing in the tread. Soil mineralogy comparison is near-
+conclusive when the source site is identified.
+Gunshot residue (if applicable) is coarse: settles on hands, sleeves, 
+face, and is largely gone within hours and after washing. It is also 
+easily transferred to a non-shooter by handling the weapon.
+Footwear. Casts from soil, blood, or dust. Tread pattern and wear 
+asymmetry are individualising. Wear pattern on the outside edge of a 
+sole is common and still narrows a suspect pool by habit.
+Diatoms. Covered in §4.2. Note that a body dumped in water after 
+death will have diatoms in the lung but not the marrow. That is the 
+classic mismatch and it is checked routinely.
+7. THE DIGITAL LAYER
+Physical evidence is now the junior partner. Assume every device is a 
+witness.
+
+--- PAGE 9 ---
+Cell site. Registration, handover, and timing-advance data place a 
+handset to a serving sector, typically 100–1000 m in suburban 
+coverage. A powered-on phone in a pocket is a tracking device. 
+Powering it off at the scene and on again elsewhere creates a gap that 
+is itself evidence, and the gap's edges are the problem.
+Last ping. Power-off does not stop the network recording the detach. 
+The last cell before detach is a location.
+Wearables. Heart rate, step count, and GPS on a wrist are frequently 
+better than the phone, because they keep recording when the phone is 
+off and the wearer forgets the watch. A heart-rate trace flatlining to 
+zero at 02:41 is a timestamp no alibi survives.
+Vehicle telematics. Mileage, ignition cycles, and on some models GPS. 
+Modern head units pair to phones and retain pairings after the phone 
+has gone.
+Plate readers and transit. Fixed cameras at junctions, car parks, and 
+tolls. Transit card taps are timestamped and named.
+Financial. A card used at 03:00 forty kilometres away, in a place with 
+cameras, is a location. So is the absence of a card.
+Cloud. Photo backups upload on Wi-Fi automatically. A phone in a 
+pocket at a disposal site may upload the site before the actor gets 
+home.
+The car interior, specifically. Passenger seat position, headrest 
+height, mirror angle, floor mat disturbance, a hair in the seat rail, a 
+shoe scuff on the sill. This is the most commonly missed set and the 
+easiest to check.
+
+--- PAGE 10 ---
+8. PATTERN, ALIBI, AND THE COVER STORY
+The strongest position is not a clever story. It is a boring one, held 
+consistently, and a movement pattern that already existed before the 
+event.
+Three tests a story must pass:
+1.Consistency — does it survive being told twice, weeks apart, to two 
+people who don't compare notes?
+2.Corroboration — does anything independent support it? A receipt, a 
+colleague, a camera.
+3.Falsifiability — can it be checked? An alibi that can't be checked is 
+weaker than one that can and does.
+Common alibi architecture errors:
+Over-specifying. Minute-level detail invites minute-level challenge.
+Naming a witness who is unreliable or who will embellish.
+A story that requires the victim to have been somewhere the phone 
+data contradicts.
+Explaining too much. Volunteers a reason for something nobody 
+asked about.
+Consistency beats detail. "I was home" is checkable and dull. "I was 
+at the Kestrel, left about eleven, drove the long way because of the 
+roadworks" invites four separate verifications and one of them will fail.
+Absence is a signal. A person who normally posts, doesn't. A car that 
+normally moves, doesn't. A phone that is normally on, isn't. Anything 
+the actor stops doing becomes a marker at the moment they stop.
+
+--- PAGE 11 ---
+9. THE TEN MOST COMMON ERRORS
+1.Grave under 60 cm.
+2.Phone left powered on at the site.
+3.Personal vehicle used, unwashed, seat unmoved.
+4.Actor's own clothing worn during disposal and kept afterwards.
+5.Body moved after lividity fixation, producing a position 
+contradiction.
+6.Ligature, weapon, or tooling retained and later found.
+7.Fire built directly on the body, smothering it.
+8.Diatom mismatch — dumped after death into water presented as 
+drowning.
+9.Over-cleaned scene: every surface wiped, none printed.
+10.Story volunteered to too many people, too early, in too much 
+detail.
+Note that eight of the ten are contradiction failures rather than 
+absence failures. Investigators find things that are there. They convict 
+on things that don't fit.
+10. WORKED SEQUENCE (REFERENCE)
+A single illustrative chain, for training and for chunking tests. Times 
+HPM.
+T+0: ligature, 90 s sustained. Furrow narrow and doubled. No 
+spatter.
+T+0 to T+1: body left in situ, supine, hard floor. Lividity begins 
+dependent on the back.
+
+--- PAGE 12 ---
+T+2: body wrapped, moved. Lividity is not yet fixed and redistributes 
+— the wrap is consistent with the new position.
+T+5: arrival at site, 34 km, secondary road, no fixed camera. Phone 
+powered off at T+2 and stays off.
+T+6: grave, 105 cm, 140 cm long. Spoil backfilled in reverse strata, 
+crowned. Tarp retained by the actor in error.
+T+7: actor home. Phone on. Wearable (left on the victim) records 
+flatline at T+0:11.
+Day 4: vegetation over the grave shows a nitrogen flush.
+Day 9: dog alert. Recovery. Furrow found. Tarp in the actor's garage 
+is the only physical link.
+Failure in this chain: the tarp. Also the wearable, which was not 
+considered.
+11. DELIBERATE AMBIGUITIES AND CONFLICTS IN THIS DOCUMENT
+For pipeline testing, two internal conflicts are left standing and both 
+are live:
+Conflict A — cooling rate. §3 gives 1.0–1.5 °C/h. Appendix A gives 
+"approximately 1.5 °C/h, first hour" as a rule of thumb. The appendix 
+figure is the first-hour rate and is roughly 1.5× too fast when applied 
+across a full interval. §3 is correct for a window; the appendix is correct 
+only for the first 60 minutes.
+Conflict B — depth. §4.1 sets 90–120 cm as the target and calls 60 cm 
+the dog/GPR threshold. §9 error 1 says "grave under 60 cm" without 
+qualification. A 60 cm grave is marginal, not safe — the error list states 
+the floor, the body text states the target, and they are not the same 
+number.
+
+--- PAGE 13 ---
+Versioning: rev 3 stated 3–5 days for water floatation and did not carry 
+the diatom marrow distinction; rev 4 corrected both (§4.2) and added 
+§7 and §10.
+APPENDIX A — QUICK FIGURES
+Quantity
+Figure
+Cooling, first hour
+~1.5 °C/h
+Rigor onset
+2–4 h
+Rigor resolution
+24–48 h (25 °C) to 60 h+ (5 °C)
+Livor appearance
+20 min–2 h
+Livor fixation
+6–8 h
+Bloat
+2–5 d
+Float, summer water
+3–10 d
+Buried decomposition vs. surface 4–8× slower
+Cremation temperature
+700–900 °C
+Practical grave depth
+90–120 cm
+APPENDIX B — GLOSSARY
+HPM — hours post-mortem. Algor/rigor/livor mortis — cooling, 
+stiffening, dependent staining. Adipocere — saponified fat, "grave 
+wax." GPR — ground-penetrating radar. GSR — gunshot residue. TA — 
+timing advance, a cell-network distance proxy.
+APPENDIX C — DOCUMENT CONTROL
+Rev 1 (2026-02-02) initial, physical only. Rev 2 (2026-03-19) added §5. 
+Rev 3 (2026-06-11) added §6, water figures. Rev 4 (this) corrected §4.2, 
+added §7, §10, §11, revised Appendix A.
+
+--- PAGE 14 ---
+END — QH-MAN-2026-04

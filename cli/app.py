@@ -92,6 +92,69 @@ def ingest(
 
 
 @app.command()
+def inspect(
+    folder: Path = typer.Option(
+        Path("documents"),
+        "--folder",
+        "-f",
+        help="Directory containing PDF documents to extract and inspect.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("storage/processed_docs"),
+        "--output-dir",
+        "-o",
+        help="Directory where sanitized .txt files will be saved.",
+    ),
+):
+    """Extract raw PDF text, apply security guardrails (Secrets + PII), and export sanitized .txt files."""
+    from ingestion.inspector import DocumentInspector
+
+    console.print(f"\n[bold cyan][*] Inspecting and Sanitizing Documents[/bold cyan] from [yellow]{folder}[/yellow]")
+    if not folder.exists():
+        console.print(f"[bold red]Error: Folder or file '{folder}' does not exist.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        inspector = DocumentInspector()
+        results = inspector.inspect_and_export(folder, output_dir=output_dir)
+
+        if not results:
+            console.print("[yellow]No PDF documents found to inspect.[/yellow]\n")
+            return
+
+        table = Table(title="Document Inspection & Sanitization Summary", header_style="bold green")
+        table.add_column("PDF Document", style="cyan")
+        table.add_column("Pages", style="white", justify="right")
+        table.add_column("Raw Chars", style="dim", justify="right")
+        table.add_column("Secrets Redacted", style="bold red", justify="right")
+        table.add_column("PII Masked", style="bold yellow", justify="right")
+        table.add_column("Exported File", style="green")
+
+        for r in results:
+            sec_desc = f"{r.secrets_count}" + (f" ({', '.join(r.secrets_types)})" if r.secrets_types else "")
+            pii_desc = f"{r.pii_count}" + (f" ({', '.join(r.pii_types)})" if r.pii_types else "")
+            rel_path = Path(r.output_txt_path).name
+            table.add_row(
+                r.filename,
+                str(r.total_pages),
+                f"{r.raw_characters:,}",
+                sec_desc,
+                pii_desc,
+                f"{output_dir.name}/{rel_path}",
+            )
+
+        console.print(table)
+        console.print(
+            f"\n[bold green][OK] Processed {len(results)} document(s). Saved sanitized text to:[/bold green] [underline]{output_dir}[/underline]\n"
+        )
+
+    except Exception as e:
+        console.print(f"[bold red]Inspection failed:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+
+@app.command()
 def ask(
     query: Optional[str] = typer.Option(None, "--query", "-q", help="The question to ask."),
     mode: str = typer.Option(
@@ -169,11 +232,23 @@ def ask(
 
 @app.command()
 def evaluate(
-    dataset: Path = typer.Option(
+    target: str = typer.Option(
+        "all",
+        "--target",
+        "-t",
+        help="Target document dataset: 'forensics', 'company', or 'all'.",
+    ),
+    sample: str = typer.Option(
+        "all",
+        "--sample",
+        "-s",
+        help="Sample size: '10' (5 answerable, 5 unanswerable), '50' (25 answerable, 25 unanswerable), or 'all'.",
+    ),
+    dataset: Optional[Path] = typer.Option(
         None,
         "--dataset",
         "-d",
-        help="Path to evaluation dataset (.json or .jsonl).",
+        help="Custom path to evaluation dataset (.json or .jsonl). Overrides --target.",
     ),
     all_modes: bool = typer.Option(
         True,
@@ -186,25 +261,69 @@ def evaluate(
         "-M",
         help="Model execution mode: 'hosted', 'local', or 'all' (evaluates both hosted & local).",
     ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        "-n",
+        help="Limit evaluation to first N test cases.",
+    ),
     ablate_layer: Optional[str] = typer.Option(
         None,
         "--ablate",
         help="Disable specific guardrail layer for ablation: 'ingestion', 'query', 'context', 'output'.",
     ),
 ):
-    """Run automated benchmark evaluation across security modes and model execution modes."""
+    """Run automated benchmark evaluation across security modes with customizable sampling and target dataset."""
     console.print("\n[bold magenta][*] Multi-Layer RAG Security Evaluation Runner[/bold magenta]\n")
 
-    if dataset is None or not dataset.exists():
-        console.print(
-            f"[yellow]Notice: No external evaluation dataset passed or file not found at '{dataset}'.\n"
-            "The framework is initialized and waiting for your evaluation dataset.\n"
-            "Use `--dataset path/to/eval_dataset.json` once you provide the dataset files.[/yellow]"
-        )
-        raise typer.Exit(code=0)
+    # 1. Resolve dataset path based on --target or explicit --dataset
+    datasets_dir = Path("evaluation/datasets")
+    if dataset:
+        target_path = dataset
+    elif target.lower() == "forensics":
+        f100 = datasets_dir / "forensics_100_benchmark.json"
+        target_path = f100 if f100.exists() else datasets_dir / "forensics_benchmark.json"
+    elif target.lower() in ("company", "company_doc", "company_internal"):
+        c100 = datasets_dir / "company_100_benchmark.json"
+        target_path = c100 if c100.exists() else datasets_dir / "company_confidential_benchmark.json"
+    else:  # "all"
+        full200 = datasets_dir / "full_200_benchmark.json"
+        target_path = full200 if full200.exists() else datasets_dir / "full_evaluation_benchmark.json"
 
-    test_cases = DatasetLoader.load_from_file(dataset)
-    console.print(f"[green]Loaded {len(test_cases)} evaluation test cases from {dataset}.[/green]")
+    if not target_path.exists():
+        console.print(f"[bold red]Error: Dataset file not found at '{target_path}'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    all_cases = DatasetLoader.load_from_file(target_path)
+    console.print(f"[cyan]Loaded total {len(all_cases)} test cases from {target_path.name}.[/cyan]")
+
+    # 2. Balanced Sampling (50% answerable, 50% unanswerable)
+    from evaluation.test_case import ExpectedBehavior
+    ans_cases = [tc for tc in all_cases if tc.expected_behavior == ExpectedBehavior.ANSWER]
+    unans_cases = [tc for tc in all_cases if tc.expected_behavior != ExpectedBehavior.ANSWER]
+
+    sample_val = sample.lower().strip()
+    if sample_val in ("10", "50"):
+        target_half = 5 if sample_val == "10" else 25
+        ans_sample = ans_cases[:target_half]
+        unans_sample = unans_cases[:target_half]
+        test_cases = ans_sample + unans_sample
+        console.print(
+            f"[green]Sampled {len(test_cases)} questions: "
+            f"{len(ans_sample)} Answerable + {len(unans_sample)} Unanswerable "
+            f"(target requested: {sample_val}).[/green]"
+        )
+        if len(ans_sample) < target_half:
+            console.print(
+                f"[yellow][!] Dataset '{target_path.name}' currently contains {len(ans_cases)} answerable question(s). "
+                f"Full 50/50 balance ({target_half}/{target_half}) will be active once the expanded benchmark is loaded.[/yellow]"
+            )
+    elif limit and limit > 0:
+        test_cases = all_cases[:limit]
+        console.print(f"[green]Limited to first {len(test_cases)} test cases.[/green]")
+    else:
+        test_cases = all_cases
+        console.print(f"[green]Evaluating all {len(test_cases)} questions ({len(ans_cases)} Answerable, {len(unans_cases)} Unanswerable).[/green]")
 
     # Configure ablation if requested
     ablation_policy = None
@@ -226,6 +345,7 @@ def evaluate(
     # Generate research charts
     chart_path = EvaluationReporter.generate_research_charts(report)
     console.print(f"[bold green][OK] Research comparison chart generated:[/bold green] [underline]{chart_path}[/underline]\n")
+
 
 
 @app.command()
@@ -307,3 +427,43 @@ def status():
 
     console.print(table)
     console.print()
+
+
+@app.command()
+def clean(
+    target: str = typer.Option(
+        "both",
+        "--target",
+        "-t",
+        help="Target collections to clean: 'baseline', 'secured', 'both', or 'all'.",
+    ),
+    recreate: bool = typer.Option(
+        True,
+        "--recreate/--no-recreate",
+        "-r/-nr",
+        help="Whether to immediately recreate empty collections with proper dimensions after purge.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        "-y",
+        help="Skip interactive confirmation prompt.",
+    ),
+):
+    """Purge and reset vector collections in Qdrant (baseline_rag, secured_rag, or all)."""
+    from scripts.clean_qdrant import clean_qdrant as execute_clean
+
+    if target == "all":
+        execute_clean(clean_all=True, recreate=recreate, force=force)
+    elif target == "baseline":
+        execute_clean(collections=[settings.qdrant_collection_baseline], recreate=recreate, force=force)
+    elif target == "secured":
+        execute_clean(collections=[settings.qdrant_collection_secured], recreate=recreate, force=force)
+    else:  # "both"
+        execute_clean(
+            collections=[settings.qdrant_collection_baseline, settings.qdrant_collection_secured],
+            recreate=recreate,
+            force=force,
+        )
+

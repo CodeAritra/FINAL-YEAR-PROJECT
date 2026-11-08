@@ -44,62 +44,82 @@ All three modes share identical underlying embedding models, retrieval settings,
 
 ---
 
-## 3. Technology Stack & Hardware Constraints
+## 3. Technology Stack & Current Architecture
 - **Runtime**: Python 3.12.10 (Windows 64-bit).
+- **CLI & UX**: Typer + Rich with UTF-8 Windows codepage reconfigure.
 - **Hardware Profile**: 8 GB RAM laptop.
 - **Architecture**: Hybrid Local + Cloud Inference:
-  - **Local Operations**: Python CLI (Typer + Rich), PDF parsing (PyMuPDF), Text Chunking (LangChain text splitters), Secret regex detection, Presidio PII detection, sentence-transformers (all-MiniLM-L6-v2).
-  - **Vector Storage**: Qdrant Cloud (managed via URL + API Key).
-  - **Cloud Inference (Lightweight memory footprint)**:
-    - LLM Generation: Qwen2.5 (via Ollama Cloud or OpenAI-compatible hosted provider).
-    - Prompt Injection Classifier: ProtectAI DeBERTa v3 Prompt Injection v2 (via Hugging Face Inference API / hosted endpoint).
-    - Harmful Content Guard: Meta Llama Guard 3 1B (via hosted API / Ollama Cloud).
-  - **Evaluation & Metrics**: Promptfoo, DeepEval, Ragas, Scikit-learn, Pandas, Matplotlib.
-  - **Testing**: Pytest.
+  - **Local Operations**:
+    - PDF parsing (`pymupdf` / PyMuPDF).
+    - Text chunking (`langchain_text_splitters` RecursiveCharacterTextSplitter).
+    - Document inspection & export (`ingestion/inspector.py`).
+    - Secret & credential detector (10 Regex patterns + Shannon Entropy validation).
+    - PII Anonymization (Microsoft Presidio Analyzer & Anonymizer with spaCy en_core_web_sm fallback).
+  - **Vector Storage**: Qdrant Cloud (`baseline_rag` and `secured_rag`, 768 dims, Cosine distance) with local in-memory fallback.
+  - **Embedding Engine**: Google Gemini Embedding 2 (`gemini-embedding-2`, 768 dims) via official `google-genai` SDK.
+  - **Prompt Injection Defense**: Meta Llama Prompt Guard 2 86M (`meta-llama/llama-prompt-guard-2-86m`) hosted via Groq API.
+  - **Main LLM Generation**:
+    - Hosted Mode: Groq GPT-OSS-120B (`openai/gpt-oss-120b`).
+    - Local Mode: Ollama (`llama3.2:1b` or user-selected model via `http://localhost:11434/v1`).
+  - **Evaluation & Reporting**: Deterministic programmatic metrics evaluator (`evaluation/metrics.py`), live console status logging, CSV/JSONL persistence, and Matplotlib research graph rendering.
+  - **Testing**: Pytest (11 unit and integration tests passing).
 
 ---
 
-## 4. Document Categories & Threat Model
-*(Note: Test datasets/PDFs to be provided by user later; framework is built to accept external data cleanly)*
-1. **Company Confidential Data**: Synthetic API keys, passwords, employee PII, internal memos.
-2. **Drug-Related Information**: Legitimate medical/side-effect safety vs. harmful misuse instructions.
-3. **Weapon-Related Information**: Historical/classification safety vs. operational weaponization content.
-4. **Adversarial Injections**: Payloads hidden in documents attempting prompt overrides, system prompt exfiltration, and jailbreaks.
+## 4. Document Categories & Research Documents
+1. **Forensics & Evidence Suppression (`documents/forensics.pdf`)**:
+   - The Quiet Hours homicide, post-mortem interval, and evidence suppression field manual.
+   - Evaluates system refusal against operational physical harm instructions.
+2. **Company Confidential Data (`documents/company internal doc.pdf`)**:
+   - Northwind Analytics confidential internal corporate packet.
+   - Contains live credential-shaped strings (AWS Access Keys, IAM secrets, PostgreSQL & MongoDB database connection URIs) and internal employee PII.
+   - Evaluates credential leakage interception (SILR) and role-based access control.
 
 ---
 
 ## 5. System Architecture
 ```
 [Ingestion Pipeline]
-  Raw PDF ──> PyMuPDF ──> Chunking ──> [Security Scanner] ──> [Policy Engine: Allow / Mask / Quarantine]
-                                                                        │
-                                                                        ▼
-                                                       [Embeddings: all-MiniLM-L6-v2]
-                                                                        │
-                                                                        ▼
-                                                            [Qdrant Cloud Collections]
-                                                            (baseline vs. secured)
+  PDFs in documents/ ──> PyMuPDF ──> [DocumentInspector: Redact Secrets + Mask PII]
+                                            │
+                                            ├─> storage/processed_docs/<doc>.txt
+                                            ▼
+                                  LangChain Chunker (~500 chars)
+                                            │
+               ┌────────────────────────────┴───────────────────────────┐
+               ▼                                                        ▼
+       [Baseline Branch]                                        [Secured Branch]
+   Raw Chunks (Unsanitized)                             PolicyEngine.evaluate_ingestion()
+               │                                           ├─ Llama Prompt Guard 2 (Groq)
+               │                                           ├─ Secret Redactor (Regex+Entropy)
+               │                                           └─ Presidio PII Masker
+               │                                                        │
+               ▼                                                        ▼
+   Gemini Embedding 2 (768d)                                Gemini Embedding 2 (768d)
+               │                                                        │
+               ▼                                                        ▼
+   Qdrant: baseline_rag                                     Qdrant: secured_rag
 
 [Query Pipeline (Mode 3)]
-  User Query ──> [Query Guard: Injection & Intent]
+  User Query ──> [Query Guard: Llama Prompt Guard 2 86M (Groq)]
                      │
                      ▼
-                 [Auth & Scope Engine]
+                 [RBAC Authorization Engine]
                      │
                      ▼
-             [Qdrant Retrieval]
+             [Qdrant Retrieval (secured_rag)]
                      │
                      ▼
-        [Retrieved-Context Scanner & Sanitizer]
+        [Retrieved-Context Sanitizer (<retrieved_untrusted_data>)]
                      │
                      ▼
-        [Secure Prompt Framing (Untrusted Context)]
+        [Secure Prompt Framing (Defensive System Prompt)]
                      │
                      ▼
-             [LLM Generation: Qwen2.5]
+             [LLM Router: Groq GPT-OSS-120B / Ollama]
                      │
                      ▼
-        [Output Guard: Leakage & Llama Guard]
+        [Output Guard: Secret Leak Interception & Redaction]
                      │
                      ▼
                Final Response

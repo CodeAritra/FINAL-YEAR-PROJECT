@@ -44,12 +44,63 @@ class GroqProvider:
         llm_model: str | None = None,
         prompt_guard_model: str | None = None,
         timeout: float = 30.0,
+        max_retries: int = 8,
+        base_delay: float = 2.0,
     ):
         self.api_key = api_key or settings.groq_api_key
         self.base_url = (base_url or settings.groq_base_url).rstrip("/")
         self.llm_model = llm_model or settings.groq_model
         self.prompt_guard_model = prompt_guard_model or settings.groq_prompt_guard_model
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self._client: httpx.Client | None = None
+
+    def _get_client(self) -> httpx.Client:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.Client(timeout=self.timeout)
+        return self._client
+
+    def _extract_retry_delay(self, response: httpx.Response | None, default_delay: float = 2.0) -> float:
+        """Extract wait delay in seconds from HTTP 429 response headers or body."""
+        if response is None:
+            return default_delay
+
+        # 1. Check standard Retry-After header
+        retry_header = response.headers.get("retry-after")
+        if retry_header:
+            try:
+                return max(float(retry_header), 0.5)
+            except ValueError:
+                pass
+
+        # 2. Check Groq/OpenAI rate limit reset headers
+        for h in ("x-ratelimit-reset-requests", "x-ratelimit-reset-tokens"):
+            val = response.headers.get(h)
+            if val:
+                try:
+                    if val.endswith("ms"):
+                        return max(float(val[:-2]) / 1000.0, 0.5)
+                    elif val.endswith("s"):
+                        return max(float(val[:-1]), 0.5)
+                    return max(float(val), 0.5)
+                except ValueError:
+                    pass
+
+        # 3. Check JSON error body or text for "try again in X"
+        try:
+            body = response.text
+            m = re.search(r"try again in\s+([\d\.]+)\s*(s|ms)?", body, re.IGNORECASE)
+            if m:
+                val = float(m.group(1))
+                unit = (m.group(2) or "s").lower()
+                if unit == "ms":
+                    return max(val / 1000.0 + 0.5, 0.5)
+                return max(val + 0.5, 0.5)
+        except Exception:
+            pass
+
+        return default_delay
 
     # --------------------------------------------------------------------------
     # 1. Main LLM Generation (GPT-OSS-120B)
@@ -61,7 +112,7 @@ class GroqProvider:
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> LLMResponse:
-        """Call Groq API with GPT-OSS-120B."""
+        """Call Groq API with GPT-OSS-120B, retrying on rate limits (429)."""
         start_time = time.perf_counter()
 
         if not self.api_key:
@@ -85,34 +136,78 @@ class GroqProvider:
             "max_tokens": max_tokens,
         }
 
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
+        client = self._get_client()
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
                 resp = client.post(url, headers=headers, json=payload)
+
+                if resp.status_code == 429:
+                    delay = self._extract_retry_delay(resp, self.base_delay * (1.5 ** (attempt - 1)))
+                    logger.warning(
+                        f"Groq LLM rate limit (429) hit. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+
                 resp.raise_for_status()
                 data = resp.json()
 
-            latency = (time.perf_counter() - start_time) * 1000
-            content = data["choices"][0]["message"]["content"]
-            tokens = data.get("usage", {}).get("total_tokens", 0)
+                latency = (time.perf_counter() - start_time) * 1000
+                content = data["choices"][0]["message"]["content"]
+                tokens = data.get("usage", {}).get("total_tokens", 0)
 
-            return LLMResponse(
-                content=content,
-                model=self.llm_model,
-                provider="groq",
-                tokens_used=tokens,
-                latency_ms=latency,
-                raw_response=data,
-            )
+                return LLMResponse(
+                    content=content,
+                    model=self.llm_model,
+                    provider="groq",
+                    tokens_used=tokens,
+                    latency_ms=latency,
+                    raw_response=data,
+                )
 
-        except Exception as e:
-            logger.error(f"Groq LLM generation error ({self.llm_model}): {e}")
-            latency = (time.perf_counter() - start_time) * 1000
-            return LLMResponse(
-                content=f"[Error during Groq generation: {e}]",
-                model=self.llm_model,
-                provider="groq",
-                latency_ms=latency,
-            )
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    delay = self._extract_retry_delay(e.response, self.base_delay * (1.5 ** (attempt - 1)))
+                    logger.warning(
+                        f"Groq LLM rate limit (429) hit. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"Groq LLM HTTP error ({e.response.status_code}): {e}")
+                    latency = (time.perf_counter() - start_time) * 1000
+                    return LLMResponse(
+                        content=f"[Error during Groq generation: {e}]",
+                        model=self.llm_model,
+                        provider="groq",
+                        latency_ms=latency,
+                    )
+            except Exception as e:
+                if "429" in str(e):
+                    delay = self.base_delay * (1.5 ** (attempt - 1))
+                    logger.warning(
+                        f"Groq LLM rate limit (429) detected. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+
+                logger.error(f"Groq LLM generation error ({self.llm_model}): {e}")
+                latency = (time.perf_counter() - start_time) * 1000
+                return LLMResponse(
+                    content=f"[Error during Groq generation: {e}]",
+                    model=self.llm_model,
+                    provider="groq",
+                    latency_ms=latency,
+                )
+
+        latency = (time.perf_counter() - start_time) * 1000
+        return LLMResponse(
+            content=f"[Groq LLM failed: rate limits (429) exceeded after {self.max_retries} retries]",
+            model=self.llm_model,
+            provider="groq",
+            latency_ms=latency,
+        )
 
     # --------------------------------------------------------------------------
     # 2. Prompt Injection Detection (Llama Prompt Guard 2 86M)
@@ -120,6 +215,7 @@ class GroqProvider:
     def check_prompt_injection(self, text: str) -> PromptGuardResult:
         """
         Scan user input or retrieved chunk using Llama Prompt Guard 2 86M on Groq.
+        In case of rate limits (429), waits and retries without falling back to heuristic.
         Returns structured classification and confidence score.
         """
         if not text or not text.strip():
@@ -148,45 +244,80 @@ class GroqProvider:
             "max_tokens": 50,
         }
 
-        try:
-            with httpx.Client(timeout=10.0) as client:
+        client = self._get_client()
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
                 resp = client.post(url, headers=headers, json=payload)
+
+                if resp.status_code == 429:
+                    delay = self._extract_retry_delay(resp, self.base_delay * (1.5 ** (attempt - 1)))
+                    logger.warning(
+                        f"Groq Prompt Guard rate limit (429) hit. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+
                 resp.raise_for_status()
                 data = resp.json()
 
-            content = data["choices"][0]["message"]["content"].strip().upper()
+                content = data["choices"][0]["message"]["content"].strip().upper()
 
-            # Analyze Prompt Guard output
-            if "INJECTION" in content:
+                # Analyze Prompt Guard output
+                if "INJECTION" in content:
+                    return PromptGuardResult(
+                        is_injection=True,
+                        score=0.95,
+                        label="INJECTION",
+                        explanation=f"Llama Prompt Guard 2 detected indirect/direct prompt injection ({content}).",
+                        model=self.prompt_guard_model,
+                    )
+                elif "JAILBREAK" in content:
+                    return PromptGuardResult(
+                        is_injection=True,
+                        score=0.98,
+                        label="JAILBREAK",
+                        explanation=f"Llama Prompt Guard 2 detected jailbreak framing ({content}).",
+                        model=self.prompt_guard_model,
+                    )
+
                 return PromptGuardResult(
-                    is_injection=True,
-                    score=0.95,
-                    label="INJECTION",
-                    explanation=f"Llama Prompt Guard 2 detected indirect/direct prompt injection ({content}).",
+                    is_injection=False,
+                    score=0.05,
+                    label="BENIGN",
+                    explanation="Llama Prompt Guard 2 classified text as benign.",
                     model=self.prompt_guard_model,
                 )
-            elif "JAILBREAK" in content:
-                return PromptGuardResult(
-                    is_injection=True,
-                    score=0.98,
-                    label="JAILBREAK",
-                    explanation=f"Llama Prompt Guard 2 detected jailbreak framing ({content}).",
-                    model=self.prompt_guard_model,
+
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    delay = self._extract_retry_delay(e.response, self.base_delay * (1.5 ** (attempt - 1)))
+                    logger.warning(
+                        f"Groq Prompt Guard rate limit (429) hit. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"Groq Prompt Guard HTTP error ({e.response.status_code}): {e}")
+                    return self._heuristic_prompt_guard(text)
+            except Exception as e:
+                if "429" in str(e):
+                    delay = self.base_delay * (1.5 ** (attempt - 1))
+                    logger.warning(
+                        f"Groq Prompt Guard rate limit (429) detected in error. Waiting {delay:.2f}s before retry (attempt {attempt}/{self.max_retries})..."
+                    )
+                    time.sleep(delay)
+                    continue
+
+                logger.warning(
+                    f"Groq Prompt Guard call failed ({e}). Falling back to heuristic classifier."
                 )
+                return self._heuristic_prompt_guard(text)
 
-            return PromptGuardResult(
-                is_injection=False,
-                score=0.05,
-                label="BENIGN",
-                explanation="Llama Prompt Guard 2 classified text as benign.",
-                model=self.prompt_guard_model,
-            )
-
-        except Exception as e:
-            logger.warning(
-                f"Groq Prompt Guard call failed ({e}). Falling back to heuristic classifier."
-            )
-            return self._heuristic_prompt_guard(text)
+        logger.error(
+            f"All {self.max_retries} retries for Groq Prompt Guard exhausted due to rate limits (429). Falling back to heuristic classifier."
+        )
+        return self._heuristic_prompt_guard(text)
 
     def _heuristic_prompt_guard(self, text: str) -> PromptGuardResult:
         """High-precision heuristic fallback when offline or Groq API is unavailable."""
