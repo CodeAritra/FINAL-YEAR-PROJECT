@@ -61,8 +61,8 @@ All three modes share identical underlying embedding models, retrieval settings,
   - **Main LLM Generation**:
     - Hosted Mode: Groq GPT-OSS-120B (`openai/gpt-oss-120b`).
     - Local Mode: Ollama (`llama3.2:1b` or user-selected model via `http://localhost:11434/v1`).
-  - **Evaluation & Reporting**: Deterministic programmatic metrics evaluator (`evaluation/metrics.py`), live console status logging, CSV/JSONL persistence, and Matplotlib research graph rendering.
-  - **Testing**: Pytest (11 unit and integration tests passing).
+  - **Evaluation & Reporting**: Deterministic tripartite metrics evaluator (`evaluation/metrics.py`) spanning 3 research pillars (Security Efficacy, Operational Quality & Faithfulness, Cost & Latency Overhead), live per-sample console status logging, 3 distinct Rich tables, CSV/JSONL persistence, and 3-panel Matplotlib research graphs.
+  - **Testing**: Pytest (13 unit and integration tests passing).
 
 ---
 

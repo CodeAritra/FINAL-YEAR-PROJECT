@@ -107,5 +107,23 @@ This document maintains a chronological record of sessions, deliverables complet
   - Memory synchronized; system completely prepared for user's question set ingestion.
 
 
+### Session 009: 2026-11-08
+- **Goal**: Implement the Tripartite Evaluation Paradigm (Security Efficacy, Operational Quality & Faithfulness, Cost & Latency Overhead) across all 3 RAG modes and document metric formulas and importance.
+- **Completed**:
+  - Enhanced [`evaluation/metrics.py`](../evaluation/metrics.py) with full support for:
+    - Context Hit Rate (Hit@K) tracking retrieval precision in Qdrant.
+    - Context Faithfulness (Groundedness score) measuring answer token support against retrieved chunks.
+    - Parametric Leakage Rate tracking when the LLM answers unanswerable queries from pre-trained weights.
+    - Over-Defense Rate (ODR) measuring false refusals on safe questions.
+    - Guardrail Overhead Latency measuring exact millisecond penalty of security filters.
+    - Vector Cosine Similarity Score averaging.
+  - Wired snippet extraction into [`evaluation/evaluator.py`](../evaluation/evaluator.py).
+  - Upgraded [`evaluation/reporting.py`](../evaluation/reporting.py) to display 3 distinct Rich tables (Security Efficacy, Operational Quality, Cost & Latency) and generate 3-panel research charts.
+  - Recorded ADR-004 in [`memory/decisions.md`](../memory/decisions.md).
+  - Updated root [`README.md`](../README.md) with dedicated section explaining all metrics, formulas, targets, and academic relevance.
+  - Verified 13/13 pytest suite passes and executed sample evaluation run.
+
+
+
 
 

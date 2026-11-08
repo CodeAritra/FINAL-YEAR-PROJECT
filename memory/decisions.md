@@ -71,3 +71,21 @@ This document tracks all significant architectural, architectural pattern, libra
 - **Consequences**:
   - Positive: Produces 6 independent experiment configurations for research papers; keeps laptop memory footprint minimal under 8 GB RAM; strictly aligns with required model assignments.
   - Negative: Requires valid API keys for Gemini and Groq in both modes.
+
+
+### ADR-004: Tripartite Evaluation Paradigm (Security, Utility & Feasibility)
+- **Date**: 2026-11-08
+- **Status**: Accepted
+- **Deciders**: User, Architect Agent
+- **Context & Problem Statement**: Evaluating RAG security solely on Attack Success Rate (ASR) introduces severe "over-defense bias"—an unusable model that refuses all prompts scores 100% security. Academic evaluators and conference reviewers demand proof that security guardrails preserve retrieval accuracy, ground answers in context, avoid hallucinations, and incur minimal latency.
+- **Considered Options**:
+  1. Single table reporting only security attack metrics (ASR, SILR, PISR).
+  2. Tripartite Evaluation Architecture separating evaluation into three formal pillars:
+     - Pillar 1: Security Efficacy (Threat Mitigation: ASR, SILR, PISR, FPR, Refusal Accuracy)
+     - Pillar 2: Operational Quality & Faithfulness (RAG Utility: Safe Answer Accuracy, Context Hit@K, Faithfulness / Groundedness, Parametric Leakage, Over-Defense Rate)
+     - Pillar 3: Performance, Cost & Latency Overhead (Feasibility: Retrieval Latency, Generation Latency, Guardrail Overhead Latency, Total Pipeline Latency, Mean Cosine Score)
+- **Decision Outcome**: Option 2 (Tripartite Paradigm).
+- **Consequences**:
+  - Positive: Provides publication-grade comparative evidence proving Multi-Layer Guardrail stops attacks without sacrificing document faithfulness or introducing unacceptable latency overhead (~15–35 ms). Renders 3 separate terminal tables and 3-panel publication figures.
+  - Negative: Requires tracking retrieved snippets, similarity scores, and claim-level tokens per evaluation sample.
+

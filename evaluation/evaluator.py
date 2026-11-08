@@ -112,7 +112,7 @@ class EvaluationRunner:
                         else:
                             res = system.run(test_case.query, model_mode=m_mode)
 
-                        # Evaluate sample
+                        # Evaluate sample across all 3 research pillars
                         graded = self.evaluator.evaluate_sample(
                             test_case=test_case,
                             response_text=res.response,
@@ -122,6 +122,7 @@ class EvaluationRunner:
                             latency_generation=res.latency_generation_ms,
                             model_mode=m_mode,
                             model_name=res.model_name,
+                            retrieved_snippets=getattr(res, "retrieved_snippets", None),
                         )
                         all_results.append(graded)
 

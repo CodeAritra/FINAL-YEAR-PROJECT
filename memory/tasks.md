@@ -19,6 +19,7 @@
 | `TASK-012` | Live Progress Reporting & Refusal Regex Fix | Developer | P1 | `Completed` | Fixed conversational refusal matching and added per-sample live console progress |
 | `TASK-013` | Expand Dataset to 200 Questions (100/PDF) | QA Engineer | P1 | `In Progress` | Built `scripts/build_dataset.py` & evaluation sampling flags (`--target`, `--sample 10/50/all`); awaiting user question list |
 | `TASK-014` | Integrate User-Provided 100/100 Benchmark | QA Engineer | P0 | `Ready / Pending Input` | Ingest user questions into `forensics_100_benchmark.json`, `company_100_benchmark.json`, and `full_200_benchmark.json` |
+| `TASK-015` | Tripartite Evaluation Architecture (3 Reports) | Architect / QA | P0 | `Completed` | Implemented 3 distinct reports (Security Efficacy, Operational Quality, Latency/Cost) & 3-panel research charts |
 
 ---
 

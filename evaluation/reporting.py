@@ -19,98 +19,188 @@ console = Console()
 
 
 class EvaluationReporter:
-    """Renders tabular comparison reports and research graphs."""
+    """Renders tabular comparison reports and research graphs across the 3 evaluation pillars."""
 
     @staticmethod
     def print_terminal_report(report: EvaluationRunReport) -> None:
-        """Display formatted comparison metrics in the terminal using Rich."""
-        table = Table(
-            title=f"[*] Security Evaluation Benchmark Results [Run: {report.timestamp}]",
+        """Display formatted comparison metrics across the 3 research pillars using Rich."""
+        console.print(f"\n[bold magenta]═══════════════════════════════════════════════════════════════════════════════════════════[/bold magenta]")
+        console.print(f"       [bold white]TRIPARTITE RAG SECURITY & QUALITY EVALUATION REPORT [Run: {report.timestamp}][/bold white]")
+        console.print(f"[bold magenta]═══════════════════════════════════════════════════════════════════════════════════════════[/bold magenta]\n")
+
+        # ---------------------------------------------------------
+        # Table 1: Security Efficacy Report (Pillar 1)
+        # ---------------------------------------------------------
+        table_sec = Table(
+            title="[bold red]1. Security Efficacy Benchmark (Threat Mitigation)[/bold red]",
             header_style="bold magenta",
         )
-
-        table.add_column("Security Mode", style="cyan", no_wrap=True)
-        table.add_column("Exec Mode", style="yellow")
-        table.add_column("Main Model", style="dim white")
-        table.add_column("ASR (%)", justify="right", style="red")
-        table.add_column("SILR (%)", justify="right", style="bright_red")
-        table.add_column("PISR (%)", justify="right", style="bright_yellow")
-        table.add_column("FPR (%)", justify="right", style="yellow")
-        table.add_column("Safe Acc (%)", justify="right", style="green")
-        table.add_column("Refusal Acc (%)", justify="right", style="bright_green")
-        table.add_column("Mean Lat (ms)", justify="right", style="blue")
+        table_sec.add_column("Security Mode", style="cyan", no_wrap=True)
+        table_sec.add_column("Exec Mode", style="yellow")
+        table_sec.add_column("Main Model", style="dim white")
+        table_sec.add_column("ASR (%) ↓", justify="right", style="bold red")
+        table_sec.add_column("SILR (%) ↓", justify="right", style="bright_red")
+        table_sec.add_column("PISR (%) ↓", justify="right", style="bright_yellow")
+        table_sec.add_column("FPR (%) ↓", justify="right", style="yellow")
+        table_sec.add_column("Refusal Acc (%) ↑", justify="right", style="bold green")
 
         for mode_key in report.modes_evaluated:
             m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
             if not m:
                 continue
-
-            table.add_row(
+            table_sec.add_row(
                 m.mode.upper(),
                 m.model_mode.upper(),
-                m.model_name[:24],
+                m.model_name[:20],
                 f"{m.attack_success_rate:.1f}%",
                 f"{m.sensitive_info_leakage_rate:.1f}%",
                 f"{m.prompt_injection_success_rate:.1f}%",
                 f"{m.false_positive_rate:.1f}%",
-                f"{m.safe_answer_accuracy:.1f}%",
                 f"{m.refusal_accuracy:.1f}%",
-                f"{m.avg_latency_total_ms:.1f}",
             )
 
-        console.print("\n")
-        console.print(table)
-        console.print(f"[dim]Total test samples evaluated: {report.total_test_cases}[/dim]")
-        console.print(f"[dim]Results saved to: {report.jsonl_output_path}[/dim]\n")
+        console.print(table_sec)
+        console.print("[dim]  Note: ASR = Attack Success Rate, SILR = Secret Leakage, PISR = Prompt Injection, FPR = False Positives[/dim]\n")
+
+        # ---------------------------------------------------------
+        # Table 2: Operational Quality & Groundedness Report (Pillar 2)
+        # ---------------------------------------------------------
+        table_qual = Table(
+            title="[bold green]2. Operational Quality & Groundedness Benchmark (RAG Utility)[/bold green]",
+            header_style="bold green",
+        )
+        table_qual.add_column("Security Mode", style="cyan", no_wrap=True)
+        table_qual.add_column("Exec Mode", style="yellow")
+        table_qual.add_column("Main Model", style="dim white")
+        table_qual.add_column("Safe Acc (%) ↑", justify="right", style="bold green")
+        table_qual.add_column("Context Hit Rate ↑", justify="right", style="cyan")
+        table_qual.add_column("Faithfulness (%) ↑", justify="right", style="bold cyan")
+        table_qual.add_column("Parametric Leak ↓", justify="right", style="bold red")
+        table_qual.add_column("Over-Defense (ODR) ↓", justify="right", style="yellow")
+
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            table_qual.add_row(
+                m.mode.upper(),
+                m.model_mode.upper(),
+                m.model_name[:20],
+                f"{m.safe_answer_accuracy:.1f}%",
+                f"{m.context_hit_rate:.1f}%",
+                f"{m.avg_faithfulness:.1f}%",
+                f"{m.parametric_leakage_rate:.1f}%",
+                f"{m.over_defense_rate:.1f}%",
+            )
+
+        console.print(table_qual)
+        console.print("[dim]  Note: Faithfulness = Claim Grounding in Chunks, Parametric Leak = Answering Out-of-Scope from Weights[/dim]\n")
+
+        # ---------------------------------------------------------
+        # Table 3: Performance, Cost & Latency Report (Pillar 3)
+        # ---------------------------------------------------------
+        table_perf = Table(
+            title="[bold blue]3. Performance, Cost & Latency Benchmark (Operational Feasibility)[/bold blue]",
+            header_style="bold blue",
+        )
+        table_perf.add_column("Security Mode", style="cyan", no_wrap=True)
+        table_perf.add_column("Exec Mode", style="yellow")
+        table_perf.add_column("Retrieval Lat", justify="right", style="cyan")
+        table_perf.add_column("Generation Lat", justify="right", style="white")
+        table_perf.add_column("Guardrail Overhead", justify="right", style="bold magenta")
+        table_perf.add_column("Total Latency", justify="right", style="bold blue")
+        table_perf.add_column("Mean Vector Score", justify="right", style="dim white")
+
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            table_perf.add_row(
+                m.mode.upper(),
+                m.model_mode.upper(),
+                f"{m.avg_latency_retrieval_ms:.1f} ms",
+                f"{m.avg_latency_generation_ms:.1f} ms",
+                f"{m.avg_guardrail_overhead_ms:.1f} ms",
+                f"{m.avg_latency_total_ms:.1f} ms",
+                f"{m.avg_retrieval_score:.4f}",
+            )
+
+        console.print(table_perf)
+        console.print(f"[dim]Total test samples evaluated: {report.total_test_cases} | Results saved to: {report.jsonl_output_path}[/dim]\n")
 
     @staticmethod
     def generate_research_charts(report: EvaluationRunReport, output_path: str | Path | None = None) -> str:
-        """Generate side-by-side Matplotlib bar charts comparing configurations."""
+        """Generate 3-panel Matplotlib comparison charts comparing the 3 research pillars."""
         modes = report.modes_evaluated
         if not modes:
             return ""
 
         metrics_list = [report.metrics_by_mode[m] for m in modes if m in report.metrics_by_mode]
         labels = [f"{m.mode.title()}\n({m.model_mode})" for m in metrics_list]
+        x = range(len(labels))
 
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(max(16, len(labels) * 3.0), 5.5), dpi=300)
+
+        # Plot 1: Security Violations (Lower is Better)
+        width = 0.2
         asrs = [m.attack_success_rate for m in metrics_list]
         silrs = [m.sensitive_info_leakage_rate for m in metrics_list]
         pisrs = [m.prompt_injection_success_rate for m in metrics_list]
         fprs = [m.false_positive_rate for m in metrics_list]
-        latencies = [m.avg_latency_total_ms for m in metrics_list]
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(max(12, len(labels) * 2.2), 5.5), dpi=300)
-
-        # Plot 1: Security Violation Rates (Lower is Better)
-        x = range(len(labels))
-        width = 0.2
 
         ax1.bar([i - 1.5 * width for i in x], asrs, width=width, label="Attack Success (ASR)", color="#e63946")
         ax1.bar([i - 0.5 * width for i in x], silrs, width=width, label="Info Leakage (SILR)", color="#f4a261")
         ax1.bar([i + 0.5 * width for i in x], pisrs, width=width, label="Prompt Injection (PISR)", color="#e76f51")
         ax1.bar([i + 1.5 * width for i in x], fprs, width=width, label="False Positives (FPR)", color="#2a9d8f")
 
-        ax1.set_title("Security Violation Rates (%) [Lower is Better]", fontsize=11, fontweight="bold")
+        ax1.set_title("1. Security Violations (%) [Lower is Better]", fontsize=10, fontweight="bold")
         ax1.set_xticks(x)
-        ax1.set_xticklabels(labels, fontweight="bold", fontsize=9)
+        ax1.set_xticklabels(labels, fontweight="bold", fontsize=8)
         ax1.set_ylabel("Violation Rate (%)")
         ax1.set_ylim(0, 105)
         ax1.grid(axis="y", linestyle="--", alpha=0.5)
-        ax1.legend(loc="upper right", fontsize=8)
+        ax1.legend(loc="upper right", fontsize=7)
 
-        # Plot 2: Total Latency Overhead (ms)
-        palette = ["#457b9d", "#1d3557", "#2b9348", "#6a4c93", "#e07a5f", "#3d405b"]
-        bar_colors = [palette[i % len(palette)] for i in range(len(labels))]
-        bars = ax2.bar(labels, latencies, color=bar_colors, width=0.45)
-        ax2.set_title("Average Total Latency (ms)", fontsize=11, fontweight="bold")
-        ax2.set_ylabel("Latency (ms)")
+        # Plot 2: Operational Quality & Groundedness (Higher is Better)
+        w2 = 0.25
+        safe_accs = [m.safe_answer_accuracy for m in metrics_list]
+        hits = [m.context_hit_rate for m in metrics_list]
+        faiths = [m.avg_faithfulness for m in metrics_list]
+
+        ax2.bar([i - w2 for i in x], safe_accs, width=w2, label="Safe Accuracy", color="#2b9348")
+        ax2.bar([i for i in x], hits, width=w2, label="Context Hit Rate", color="#0077b6")
+        ax2.bar([i + w2 for i in x], faiths, width=w2, label="Faithfulness (Grounded)", color="#55a630")
+
+        ax2.set_title("2. Operational Quality (%) [Higher is Better]", fontsize=10, fontweight="bold")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(labels, fontweight="bold", fontsize=8)
+        ax2.set_ylabel("Quality Score (%)")
+        ax2.set_ylim(0, 105)
         ax2.grid(axis="y", linestyle="--", alpha=0.5)
+        ax2.legend(loc="upper right", fontsize=7)
 
-        for bar in bars:
-            height = bar.get_height()
-            ax2.annotate(
-                f"{height:.1f} ms",
-                xy=(bar.get_x() + bar.get_width() / 2, height),
+        # Plot 3: Latency & Guardrail Overhead Breakdown (ms)
+        ret_lats = [m.avg_latency_retrieval_ms for m in metrics_list]
+        gen_lats = [m.avg_latency_generation_ms for m in metrics_list]
+        overheads = [m.avg_guardrail_overhead_ms for m in metrics_list]
+
+        p1 = ax3.bar(labels, ret_lats, width=0.45, label="Retrieval (Qdrant)", color="#457b9d")
+        p2 = ax3.bar(labels, gen_lats, width=0.45, bottom=ret_lats, label="Generation (LLM)", color="#1d3557")
+        bottom_sum = [ret_lats[i] + gen_lats[i] for i in range(len(labels))]
+        p3 = ax3.bar(labels, overheads, width=0.45, bottom=bottom_sum, label="Guardrail Overhead", color="#e76f51")
+
+        ax3.set_title("3. Latency Breakdown (ms)", fontsize=10, fontweight="bold")
+        ax3.set_xticks(x)
+        ax3.set_xticklabels(labels, fontweight="bold", fontsize=8)
+        ax3.set_ylabel("Latency (ms)")
+        ax3.grid(axis="y", linestyle="--", alpha=0.5)
+        ax3.legend(loc="upper left", fontsize=7)
+
+        for i, m in enumerate(metrics_list):
+            total_h = m.avg_latency_total_ms
+            ax3.annotate(
+                f"{total_h:.0f} ms",
+                xy=(i, total_h),
                 xytext=(0, 3),
                 textcoords="offset points",
                 ha="center",
@@ -129,5 +219,5 @@ class EvaluationReporter:
         fig.savefig(dest_path)
         plt.close(fig)
 
-        logger.info(f"Research comparison chart saved to: {dest_path}")
+        logger.info(f"Tripartite research comparison chart saved to: {dest_path}")
         return str(dest_path)
