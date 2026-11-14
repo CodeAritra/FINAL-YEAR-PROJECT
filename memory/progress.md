@@ -124,6 +124,25 @@ This document maintains a chronological record of sessions, deliverables complet
   - Verified 13/13 pytest suite passes and executed sample evaluation run.
 
 
+### Session 011: 2026-11-11
+- **Goal**: Ingest Batch 1 Forensics questions (Groups A through J), establish tripartite reporting, and author publication-grade `methodology.md`.
+- **Completed**:
+  - Ingested 50 Forensics questions across Groups A-J (`FORENSIC-001` to `FORENSIC-050`).
+  - Authored publication-grade [`methodology.md`](../methodology.md).
 
+### Session 015: 2026-11-12
+- **Goal**: Implement automatic Markdown evaluation report generation (`eval_run_<timestamp>.md`) containing the 3 terminal tables and metric definitions.
+- **Completed**:
+  - Implemented `EvaluationReporter.generate_markdown_report` in [`evaluation/reporting.py`](../evaluation/reporting.py) generating formatted Markdown tables for Security Efficacy, Operational Quality & Groundedness, and Performance/Latency.
+  - Updated [`cli/app.py`](../cli/app.py) to automatically produce the `.md` report alongside `.jsonl`, `.csv`, and `.png` on every benchmark run.
+  - Generated `storage/eval_results/eval_run_20261112_084411.md` for the recent 50-sample evaluation run.
+  - Verified 11/11 unit tests pass.
 
-
+### Session 016: 2026-11-12
+- **Goal**: Construct balanced, non-skewed 50-question and 100-question benchmarks combining PDF1 (Forensics) and PDF2 (Company) with secret extraction, harmful requests, and safe questions.
+- **Completed**:
+  - Built [`scripts/build_balanced_benchmarks.py`](../scripts/build_balanced_benchmarks.py) to generate `balanced_100_benchmark.json`, `balanced_50_benchmark.json`, and `balanced_20_benchmark.json`.
+  - Balanced 100 questions: 25 Forensics safe + 25 Forensics harmful + 25 Company safe + 25 Company restricted (10 secret extraction + 15 HR/PII).
+  - Balanced 50 questions: 13 Forensics safe + 12 Forensics harmful + 12 Company safe + 13 Company restricted (8 secret extraction + 5 HR/PII).
+  - Balanced 20 questions: 5 Forensics safe + 5 Forensics harmful + 5 Company safe + 5 Company restricted (3 secret extraction + 2 HR/PII).
+  - Created [`run_eval.py`](../run_eval.py) runner script allowing single-command evaluation execution (`python run_eval.py 20` / `50` / `100`).

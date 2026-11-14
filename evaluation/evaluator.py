@@ -35,6 +35,7 @@ class EvaluationRunReport(BaseModel):
     metrics_by_mode: dict[str, AggregatedMetrics] = Field(default_factory=dict)
     jsonl_output_path: str
     csv_output_path: str
+    md_output_path: str = ""
 
 
 class EvaluationRunner:
@@ -59,10 +60,12 @@ class EvaluationRunner:
         test_cases: list[EvaluationTestCase],
         model_mode: str = "hosted",
         ablation_policy: PolicyEngine | None = None,
+        pacing_delay: float | None = None,
     ) -> EvaluationRunReport:
         """
         Run test cases across Baseline, Prompt-Only, and Guardrail systems.
         Supports model_mode: 'hosted', 'local', or 'all' (runs both hosted and local).
+        Includes proactive rate-pacing to stay strictly within API token quotas (e.g. Groq 8K TPM).
         """
         logger.info(f"Starting evaluation run on {len(test_cases)} test cases in model_mode='{model_mode}'.")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -86,6 +89,16 @@ class EvaluationRunner:
         total_evaluations = len(exec_modes) * len(modes) * len(test_cases)
         completed_count = 0
 
+        # Determine effective pacing delay for hosted LLM generation
+        if pacing_delay is not None:
+            effective_pacing = max(pacing_delay, 0.0)
+        elif "8b" in (settings.groq_model or "").lower():
+            effective_pacing = 1.5  # Llama-3.1-8b has 30K TPM, short pacing is sufficient
+        else:
+            effective_pacing = getattr(settings, "groq_pacing_delay", 10.0)
+
+        last_llm_call_time = 0.0
+
         for m_mode in exec_modes:
             for mode_name, system in modes:
                 composite_key = f"{mode_name} ({m_mode})"
@@ -96,10 +109,21 @@ class EvaluationRunner:
                     f"\n[bold magenta]>> Evaluating Mode: [cyan]{mode_name.upper()}[/cyan] "
                     f"([yellow]{m_mode.upper()}[/yellow]) | {len(test_cases)} Test Cases[/bold magenta]"
                 )
+                if m_mode == "hosted" and effective_pacing > 0:
+                    console.print(
+                        f"   [dim yellow]⚡ Proactive Rate-Pacing: {effective_pacing:.1f}s interval "
+                        f"(protects Groq {settings.groq_model} 8K TPM quota)[/dim yellow]"
+                    )
 
                 for tc_idx, test_case in enumerate(test_cases, 1):
                     completed_count += 1
                     try:
+                        # Proactive rate-pacing for hosted LLM generation
+                        if m_mode == "hosted" and effective_pacing > 0 and last_llm_call_time > 0:
+                            elapsed = time.perf_counter() - last_llm_call_time
+                            if elapsed < effective_pacing:
+                                time.sleep(effective_pacing - elapsed)
+
                         if mode_name == "guardrail":
                             role = UserRole(test_case.user_role.upper())
                             sens = DataSensitivity(test_case.target_sensitivity.upper())
@@ -111,6 +135,10 @@ class EvaluationRunner:
                             )
                         else:
                             res = system.run(test_case.query, model_mode=m_mode)
+
+                        # Update last LLM call time only if actual LLM generation took place
+                        if m_mode == "hosted" and effective_pacing > 0 and getattr(res, "latency_generation_ms", 0.0) > 0:
+                            last_llm_call_time = time.perf_counter()
 
                         # Evaluate sample across all 3 research pillars
                         graded = self.evaluator.evaluate_sample(
@@ -149,10 +177,6 @@ class EvaluationRunner:
                             f"\"{query_preview}\" -> {status_badge} "
                             f"[dim]({res.latency_total_ms:.0f}ms)[/dim]"
                         )
-
-                        # Gentle pacing in hosted mode for LLM generation
-                        if m_mode == "hosted" and mode_name != "guardrail":
-                            time.sleep(1.0)
 
                     except Exception as e:
                         logger.error(f"Error evaluating {test_case.test_id} on {mode_name} ({m_mode}): {e}")

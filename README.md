@@ -70,6 +70,7 @@ The framework cleanly separates **Model Execution Mode** from **Research Securit
 ```
 code/
 ├── main.py                     # CLI entry point
+├── run_eval.py                 # Quick runner for balanced 50 & 100 benchmark evaluations
 ├── config.py                   # Central settings forwarder
 ├── requirements.txt            # Python dependencies (google-genai, groq, typer, etc.)
 ├── .env.example                # Template for environment credentials
@@ -78,13 +79,15 @@ code/
 │   └── company internal doc.pdf# Internal corporate data & credential leaks document
 ├── evaluation/                 # Automated benchmarking & reporting
 │   ├── datasets/               # Dedicated evaluation benchmark datasets
-│   │   ├── forensics_benchmark.json            # 20 adversarial forensic questions
-│   │   ├── company_confidential_benchmark.json # Secret & confidential data probes
-│   │   └── full_evaluation_benchmark.json      # Combined 25-sample benchmark suite
+│   │   ├── balanced_50_benchmark.json          # 50-question balanced cross-PDF benchmark (no skew)
+│   │   ├── balanced_100_benchmark.json         # 100-question balanced cross-PDF benchmark (no skew)
+│   │   ├── forensics_100_benchmark.json        # 100 questions from forensics.pdf
+│   │   ├── company_100_benchmark.json          # 100 questions from company internal doc.pdf
+│   │   └── full_200_benchmark.json             # Combined 200-question master dataset
 │   ├── test_case.py            # Dataset loader and schema
 │   ├── metrics.py              # Deterministic metric evaluators (ASR, SILR, PISR, FPR)
 │   ├── evaluator.py            # Multi-mode automated benchmark runner
-│   └── reporting.py            # Rich comparison tables + Matplotlib charts
+│   └── reporting.py            # Rich comparison tables + Matplotlib charts + Markdown reports
 ├── config/                     # Application configuration
 │   ├── settings.py             # Pydantic Settings & startup validation
 │   └── model_config.py         # Enums for ModelExecutionMode & ResearchSecurityMode
@@ -105,10 +108,11 @@ code/
 │   └── pipeline.py             # Separate baseline vs. secured ingestion collections
 ├── scripts/                    # Standalone administration utilities
 │   ├── clean_qdrant.py         # Qdrant collection purge and reset tool
+│   ├── build_balanced_benchmarks.py # Generates balanced 50 & 100 question non-skewed test suites
 │   └── build_dataset.py        # Benchmark dataset validator, statistics & merge tool
 ├── storage/                    # Persistent runtime artifacts
 │   ├── processed_docs/         # Sanitized document exports (one .txt per PDF)
-│   └── eval_results/           # Benchmark reports (.jsonl, .csv, and .png comparison charts)
+│   └── eval_results/           # Benchmark reports (.md, .jsonl, .csv, and .png comparison charts)
 ├── guardrails/                 # Security layers
 │   ├── secret_detector.py      # Regex + Shannon entropy credential detection
 │   ├── pii_masker.py           # Microsoft Presidio Analyzer & Anonymizer
@@ -251,7 +255,26 @@ python main.py ask --model-mode local --mode guardrail --query "What is the secr
 ```
 
 ### 5. Automated Benchmark Evaluation
-Runs test cases across all three security modes with live real-time progress logging for every sample:
+Runs test cases across all three security modes with live real-time progress logging for every sample.
+
+#### Recommended: Balanced Non-Skewed Benchmark Runner
+Executes balanced questions selected equally across **both PDFs** (Forensics + Company) with a strict 50% answerable and 50% unanswerable distribution (including password theft, harmful requests, and safe inquiries):
+
+```bash
+# Run quick balanced 20-question benchmark (PDF1: 5 safe/5 harmful; PDF2: 5 safe/5 restricted with 3 secret extractions)
+python run_eval.py 20
+
+# Run balanced 50-question benchmark (PDF1: 13 safe/12 harmful; PDF2: 12 safe/13 restricted with 8 secret extractions)
+python run_eval.py 50
+
+# Run balanced 100-question benchmark (PDF1: 25 safe/25 harmful; PDF2: 25 safe/25 restricted with 10 secret extractions)
+python run_eval.py 100
+
+# Run balanced benchmark using Local LLM (Ollama)
+python run_eval.py 20 --model-mode local
+```
+
+#### Detailed CLI Evaluation Commands:
 
 ```bash
 # Evaluate 10 balanced questions (5 answerable, 5 unanswerable) on Forensics
@@ -270,7 +293,7 @@ python main.py evaluate
 python main.py evaluate --limit 5
 
 # Custom dataset override
-python main.py evaluate --dataset evaluation/datasets/forensics_benchmark.json --model-mode hosted --all
+python main.py evaluate --dataset evaluation/datasets/balanced_50_benchmark.json --model-mode hosted --all
 
 # Benchmark using Local LLM Mode (Ollama)
 python main.py evaluate --model-mode local --all
@@ -299,6 +322,10 @@ python main.py evaluate --ablate output
 Every run outputs:
 - **Live console progress**: Showing global progress `(XX/YY)`, mode badge, question preview, result status (`[REFUSED / PROTECTED]`, `[ATTACK SUCCEEDED]`, `[SECRET LEAKED]`, `[SAFE ANSWER]`), and exact latency in milliseconds.
 - **Tripartite Terminal Benchmark Reports**: Displays 3 distinct Rich tables (Security Efficacy, Operational Quality, and Latency Overhead).
+- **Markdown Evaluation Report**: Saved to `storage/eval_results/eval_run_<timestamp>.md` with all tables and metrics.
+- **Excel-ready CSV**: Saved to `storage/eval_results/eval_run_<timestamp>.csv`
+- **JSONL Full Audit Trail**: Saved to `storage/eval_results/eval_run_<timestamp>.jsonl`
+- **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png` (3-panel figures).
 - **Excel-ready CSV**: Saved to `storage/eval_results/eval_run_<timestamp>.csv`
 - **JSONL Full Audit Trail**: Saved to `storage/eval_results/eval_run_<timestamp>.jsonl`
 - **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png` (3-panel figures).

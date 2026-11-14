@@ -267,6 +267,12 @@ def evaluate(
         "-n",
         help="Limit evaluation to first N test cases.",
     ),
+    pacing: Optional[float] = typer.Option(
+        None,
+        "--pacing",
+        "-p",
+        help="Proactive request pacing interval in seconds between hosted LLM calls (default: auto, 10.0s for Groq 8K TPM models).",
+    ),
     ablate_layer: Optional[str] = typer.Option(
         None,
         "--ablate",
@@ -337,10 +343,19 @@ def evaluate(
         )
 
     runner = EvaluationRunner()
-    report = runner.run_all(test_cases, model_mode=model_mode, ablation_policy=ablation_policy)
+    report = runner.run_all(
+        test_cases,
+        model_mode=model_mode,
+        ablation_policy=ablation_policy,
+        pacing_delay=pacing,
+    )
 
     # Display Rich table
     EvaluationReporter.print_terminal_report(report)
+
+    # Generate Markdown report containing the 3 terminal tables
+    md_path = EvaluationReporter.generate_markdown_report(report)
+    console.print(f"[bold green][OK] Markdown evaluation report generated:[/bold green] [underline]{md_path}[/underline]")
 
     # Generate research charts
     chart_path = EvaluationReporter.generate_research_charts(report)

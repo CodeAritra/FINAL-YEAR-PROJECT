@@ -129,6 +129,123 @@ class EvaluationReporter:
         console.print(f"[dim]Total test samples evaluated: {report.total_test_cases} | Results saved to: {report.jsonl_output_path}[/dim]\n")
 
     @staticmethod
+    def generate_markdown_report(report: EvaluationRunReport, output_path: str | Path | None = None) -> str:
+        """Generate a comprehensive Markdown report containing the 3 evaluation tables from the terminal."""
+        dest_path = (
+            Path(output_path)
+            if output_path
+            else Path(report.jsonl_output_path).parent / f"eval_run_{report.timestamp}.md"
+        )
+
+        lines = [
+            f"# Tripartite RAG Security & Quality Evaluation Report",
+            f"",
+            f"- **Evaluation Run Timestamp**: `{report.timestamp}`",
+            f"- **Total Test Samples Evaluated**: `{report.total_test_cases}`",
+            f"- **Model Execution Modes**: `{', '.join(report.model_modes_evaluated)}`",
+            f"- **Security Modes Evaluated**: `{', '.join(report.modes_evaluated)}`",
+            f"",
+            f"---",
+            f"",
+            f"## 1. Security Efficacy Benchmark (Threat Mitigation)",
+            f"",
+            f"| Security Mode | Exec Mode | Main Model | ASR (%) ↓ | SILR (%) ↓ | PISR (%) ↓ | FPR (%) ↓ | Refusal Acc (%) ↑ |",
+            f"| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+        ]
+
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            lines.append(
+                f"| {m.mode.upper()} | {m.model_mode.upper()} | {m.model_name} | "
+                f"{m.attack_success_rate:.1f}% | {m.sensitive_info_leakage_rate:.1f}% | "
+                f"{m.prompt_injection_success_rate:.1f}% | {m.false_positive_rate:.1f}% | "
+                f"{m.refusal_accuracy:.1f}% |"
+            )
+
+        lines.extend([
+            "",
+            "> **Pillar 1 Metric Definitions**:",
+            "> - **ASR (Attack Success Rate)**: Percentage of malicious, harmful, or sensitive requests that bypassed defenses.",
+            "> - **SILR (Sensitive Information Leakage Rate)**: Frequency of unauthorized secrets, credentials, or restricted data exposure.",
+            "> - **PISR (Prompt Injection Success Rate)**: Rate of jailbreak or system instruction overrides.",
+            "> - **FPR (False Positive Rate)**: Percentage of benign questions incorrectly blocked.",
+            "> - **Refusal Accuracy**: Proportion of malicious queries properly refused.",
+            "",
+            "---",
+            "",
+            "## 2. Operational Quality & Groundedness Benchmark (RAG Utility)",
+            "",
+            "| Security Mode | Exec Mode | Main Model | Safe Acc (%) ↑ | Context Hit Rate ↑ | Faithfulness (%) ↑ | Parametric Leak ↓ | Over-Defense (ODR) ↓ |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+        ])
+
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            lines.append(
+                f"| {m.mode.upper()} | {m.model_mode.upper()} | {m.model_name} | "
+                f"{m.safe_answer_accuracy:.1f}% | {m.context_hit_rate:.1f}% | "
+                f"{m.avg_faithfulness:.1f}% | {m.parametric_leakage_rate:.1f}% | "
+                f"{m.over_defense_rate:.1f}% |"
+            )
+
+        lines.extend([
+            "",
+            "> **Pillar 2 Metric Definitions**:",
+            "> - **Safe Accuracy**: Correct answers provided on benign, answerable questions.",
+            "> - **Context Hit Rate**: Precision of retrieving ground-truth document chunks from Qdrant.",
+            "> - **Faithfulness (Groundedness)**: Token-grounding of generated claims supported by retrieved context.",
+            "> - **Parametric Leakage**: Rate of the model hallucinating ungrounded facts from pre-trained weights when context is absent.",
+            "> - **Over-Defense Rate (ODR)**: Legitimate queries refused due to false security boundaries.",
+            "",
+            "---",
+            "",
+            "## 3. Performance, Cost & Latency Benchmark (Operational Feasibility)",
+            "",
+            "| Security Mode | Exec Mode | Retrieval Lat | Generation Lat | Guardrail Overhead | Total Latency | Mean Vector Score |",
+            "| :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+        ])
+
+        for mode_key in report.modes_evaluated:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            lines.append(
+                f"| {m.mode.upper()} | {m.model_mode.upper()} | "
+                f"{m.avg_latency_retrieval_ms:.1f} ms | {m.avg_latency_generation_ms:.1f} ms | "
+                f"{m.avg_guardrail_overhead_ms:.1f} ms | {m.avg_latency_total_ms:.1f} ms | "
+                f"{m.avg_retrieval_score:.4f} |"
+            )
+
+        lines.extend([
+            "",
+            "> **Pillar 3 Metric Definitions**:",
+            "> - **Retrieval Latency**: Vector embedding and Qdrant retrieval search time.",
+            "> - **Generation Latency**: Time spent by the main LLM generating tokens.",
+            "> - **Guardrail Overhead**: Security inspection time across query guard, RBAC, context sanitization, and output scanning.",
+            "> - **Total Latency**: End-to-end user-perceived turnaround time.",
+            "> - **Mean Vector Score**: Average cosine similarity of retrieved context snippets.",
+            "",
+            "---",
+            "",
+            "### Generated Run Artifacts",
+            "",
+            f"- **Detailed Benchmark Records (JSONL)**: `{Path(report.jsonl_output_path).name}`",
+            f"- **Tabular Export (CSV)**: `{Path(report.csv_output_path).name}`",
+            f"- **Research Comparison Chart (PNG)**: `comparison_chart_{report.timestamp}.png`",
+            f"- **Markdown Summary Report (MD)**: `{dest_path.name}`",
+            "",
+        ])
+
+        dest_path.write_text("\n".join(lines), encoding="utf-8")
+        logger.info(f"Markdown evaluation report saved to: {dest_path}")
+        report.md_output_path = str(dest_path)
+        return str(dest_path)
+
+    @staticmethod
     def generate_research_charts(report: EvaluationRunReport, output_path: str | Path | None = None) -> str:
         """Generate 3-panel Matplotlib comparison charts comparing the 3 research pillars."""
         modes = report.modes_evaluated

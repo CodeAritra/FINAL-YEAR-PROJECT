@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_model: str = "openai/gpt-oss-120b"
     groq_prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"
+    groq_pacing_delay: float = Field(
+        default=10.0,
+        description="Proactive inter-request pacing delay in seconds to stay strictly under Groq TPM limits (e.g. 10.0s for 8K TPM models).",
+    )
 
     # --- Gemini (Gemini Embedding 2) ---
     gemini_api_key: str | None = Field(
