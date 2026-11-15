@@ -1,7 +1,7 @@
 # Project Context: Multi-Layer Security Framework for RAG Systems
 
 > **Status**: Active Development — Architecture & Environment Setup
-> **Last Updated**: 2026-11-05
+> **Last Updated**: 2026-11-15
 > **Domain**: AI Security, Retrieval-Augmented Generation (RAG), Applied NLP, Security Engineering
 
 ---
@@ -128,9 +128,8 @@ All three modes share identical underlying embedding models, retrieval settings,
 1. **Pillar 1: Security Efficacy (Threat Mitigation)**:
    - `ASR (Attack Success Rate)`: % of threat/harmful requests or secret extractions that bypassed defense.
    - `FPR (False Positive Rate)`: % of benign safe questions improperly blocked.
-   - `Refusal Accuracy`: % of adversarial queries correctly and safely refused.
+   - `Refusal Accuracy`: % of adversarial queries correctly and safely refused (requires explicit refusal string).
 2. **Pillar 2: Operational Quality & Groundedness (RAG Utility)**:
-   - `Benign QA Accuracy`: Correct factual answers provided on legitimate questions.
    - `Context Hit Rate (Hit@4)`: Precision of retrieving ground-truth document chunks from Qdrant.
    - `Faithfulness Score`: % of generated answer claims grounded in retrieved context.
    - `Hallucination Rate (PLR)`: Rate of generating out-of-scope facts from pre-trained weights instead of context.
@@ -141,7 +140,6 @@ All three modes share identical underlying embedding models, retrieval settings,
    - `Total Latency (ms)`: End-to-end turnaround time.
    - `Mean Vector Score`: Cosine similarity confidence in vector retrieval.
 4. **Pillar 4: Defense-in-Depth Layer Interception Breakdown**:
-   - `Input Stage Block %`: % of threats stopped by Query Guard & RBAC before vector search.
-   - `Retrieval Filter %`: % of threats filtered by sensitivity clearance during retrieval.
+   - `Input Stage (Query Guard) %`: % of threats stopped by Query Guard at boundary before vector search.
    - `Context Sanitize %`: % of threats where retrieved context was sanitized/delimiters contained.
-   - `Output Block %`: % of threats where LLM output was intercepted/secrets redacted.
+   - `Total Intercepted %`: Normalized to strictly sum to **100.0%** across active defense stages.

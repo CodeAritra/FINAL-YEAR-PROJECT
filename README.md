@@ -180,12 +180,30 @@ MODEL_MODE=hosted
 
 ---
 
-### Step 3: Diagnostics Command
-Verify connections and loaded model providers:
+### Step 3: Local LLM Setup (Optional - for Local Mode)
+If running with a local model using **Ollama**:
+1. Download and install Ollama from [ollama.com](https://ollama.com).
+2. Pull the recommended lightweight local model:
+   ```bash
+   ollama pull llama3.2:1b
+   ```
+   *(Or `ollama pull llama3.2` if you have a dedicated GPU).*
+3. Verify Ollama is running (`ollama serve` or check system tray).
+4. In `.env`, ensure:
+   ```ini
+   MODEL_MODE=local
+   OLLAMA_MODEL=llama3.2:1b
+   ```
+
+---
+
+### Step 4: Diagnostics Command
+Verify connections, database, and loaded model providers:
 
 ```bash
-python main.py status
+python main.py doctor
 ```
+*(Or `python main.py status`)*
 
 ---
 
@@ -293,6 +311,20 @@ Every benchmark suite is strictly balanced with **zero skew**:
 | `diversified_100` | 100 | 50 | 50 | 20 | 15 | 15 |
 | `diversified_200` | 200 | 100 | 100 | 40 | 30 | 30 |
 
+#### Comparing `diversified_*` vs `balanced_*` Benchmarks
+
+The repository maintains two benchmark suites:
+
+1. **`diversified_*_benchmark.json` (Recommended & Default for `run_eval.py`)**:
+   - Contains 50% benign questions and 50% threats distributed across **Input Guard**, **Context Sanitizer**, and **Output Secret Scanner**.
+   - **Populates Table 4**: Shows empirical proof that defenses intercept attacks at both the input boundary and inside retrieved context.
+   - Run directly with: `python run_eval.py 20` (or 50, 100, 200).
+
+2. **`balanced_*_benchmark.json` (Standard Attack Evasion Suite)**:
+   - Contains 50% benign questions and 50% direct threat queries (`FORENSIC-001..`, `CONF-001..`).
+   - All 10 threats are direct prompt injections or forbidden exfiltrations, so Guardrail intercepts 100% of them at the **Input Stage**.
+   - Run via: `python main.py evaluate --dataset evaluation/datasets/balanced_20_benchmark.json`
+
 #### Optional Ablation & CLI Flags
 If you wish to test ablation studies or customize runs, `run_eval.py` forwards all flags directly:
 ```bash
@@ -327,10 +359,10 @@ To provide a rigorous academic defense and publication-ready evaluation, this fr
 │        Efficacy          │   Quality & Faithfulness  │     Latency Overhead      │ Defense-in-   │
 │   (Threat Mitigation)    │       (RAG Utility)       │  (Operational Feasibility)│ Depth Stages  │
 ├──────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────┤
-│ • Attack Success (ASR)   │ • Benign QA Accuracy      │ • Retrieval Latency (ms)  │ • Input Guard │
-│ • False Positive (FPR)   │ • Context Hit Rate (Hit@4)│ • Generation Latency (ms) │ • Retrieval   │
-│ • Refusal Accuracy       │ • Faithfulness (Grounded) │ • Guardrail Overhead (ms) │ • Context     │
-│                          │ • Hallucination Rate (PLR)│ • Total Pipeline Latency  │ • Output Guard│
+│ • Attack Success (ASR)   │ • Context Hit Rate (Hit@4)│ • Retrieval Latency (ms)  │ • Input Stage │
+│ • False Positive (FPR)   │ • Faithfulness (Grounded) │ • Generation Latency (ms) │ • Context     │
+│ • Refusal Accuracy       │ • Hallucination Rate (PLR)│ • Guardrail Overhead (ms) │   Sanitizer   │
+│                          │                           │ • Total Pipeline Latency  │               │
 │                          │                           │ • Mean Cosine Vector Score│               │
 └──────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────┘
 ```
@@ -349,7 +381,6 @@ Proves that adding multi-layer security **does not degrade** normal document-ans
 
 | Metric | Definition & Formula | Academic Importance & Target |
 |---|---|---|
-| **Benign QA Accuracy ↑** | $\frac{\text{Accurate Answers on Safe Queries}}{\text{Total Safe Queries}} \times 100$ | **Core utility metric**: Proves normal users continue getting correct, high-quality answers when asking legitimate questions. Target: **$> 90\%$**. |
 | **Context Hit Rate (Hit@4) ↑** | $\frac{\text{Queries with Relevant Chunks in Top-4}}{\text{Total Queries}} \times 100$ | **Retrieval quality**: Verifies that Gemini Embedding 2 and Qdrant actually retrieved snippets from the ground-truth document section/page. Target: **$> 85\%$**. |
 | **Context Faithfulness (Groundedness) ↑** | $\frac{\text{Answer Content Tokens Grounded in Chunks}}{\text{Total Answer Content Tokens}} \times 100$ | **Anti-hallucination metric**: Measures whether claims in the answer are strictly backed by retrieved text or invented. Guardrail's `<retrieved_untrusted_data>` delimiter achieves higher faithfulness than Baseline (**$> 90\%$**). |
 | **Hallucination Rate (Parametric Leak) ↓** | $\frac{\text{Unanswerable Queries Answered from Weights}}{\text{Total Unanswerable Queries}} \times 100$ | **Parametric isolation**: When an answer is absent from the document, does the LLM answer from internal pre-training weights instead of stating the document lacks the fact? Target: **$< 5.0\%$**. |
@@ -366,14 +397,13 @@ Proves that the security architecture is lightweight and deployable in productio
 | **Mean Vector Score** | Average cosine similarity of top-K retrieved snippets. | Reflects dense embedding retrieval confidence in Qdrant. |
 
 #### Pillar 4: Defense-in-Depth Layer Interception Breakdown
-Measures the exact distribution of where adversarial threat requests are neutralized across the multi-layer pipeline (calculated out of all tested threat queries):
+Measures where threats are neutralized across the active defense layers (normalized to **100.0%** of intercepted threats):
 
 | Stage | Intercepting Guardrail | Academic Function & Target |
 |---|---|---|
-| **Input Stage (Query/RBAC) %** | Meta Llama Prompt Guard 2 86M + RBAC Clearance Engine | Catches prompt injections and clearance violations before vector database access. Target: **$> 90\%$**. |
-| **Retrieval Filter %** | Sensitivity Metadata Enforcement | Prunes chunks violating role clearances during similarity search. Target: **$0.0\%$** (when input guard is active). |
-| **Context Sanitize %** | Untrusted Delimiter Containment & Instruction Stripper | Neutralizes indirect prompt injection prefixes in retrieved document chunks. |
-| **Output Block %** | Secret Leak Interceptor & Sensitive Pattern Redactor | Final defense line catching any credentials or restricted data generated by the LLM. Target: **$100\%$ interception of unmasked credentials**. |
+| **Input Stage (Query Guard) %** | Meta Llama Prompt Guard 2 86M + Adversarial Heuristics | Catches direct prompt injections and explicit jailbreaks at the boundary before vector search. |
+| **Context Sanitize %** | Untrusted Delimiter Containment & Instruction Stripper | Neutralizes indirect prompt injection payloads and redacts credentials in retrieved context before generation. |
+| **Total Intercepted %** | Complete Active Defense Pipeline | Guaranteed to sum to **$100.0\%$** across active defense stages. |
 
 ---
 
