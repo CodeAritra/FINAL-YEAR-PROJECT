@@ -243,3 +243,17 @@ This document maintains a chronological record of sessions, deliverables complet
   - Re-rendered all 4 individual research charts and the combined 2x2 publication figure via `render_charts_from_md.py`.
   - Added Section 3: High-Level Design (HLD) of the Full System to [`learning.md`](../learning.md) and synchronized with [`landing.md`](../landing.md).
   - Verified 11/11 tests pass.
+
+### Session 026: 2026-11-15
+- **Goal**: Synchronize `methodology.md` with recent architecture changes (llama3.2, 3-stage defense breakdown, SecretDetector Shannon entropy, removed Mean Vector Score, and complete purge of disabled RBAC) and export to publication-ready PDF.
+- **Completed**:
+  - Completely purged all traces of disabled RBAC / clearance scoping from [`methodology.md`](../methodology.md):
+    - Removed Layer 3 (RBAC) box from the real-time query architecture diagram.
+    - Updated Stage Specifications to 5 active levels: Phase 1 (Ingestion Sanitization), Level 1 (Query Perimeter Guard), Level 2 (Semantic Retrieval), Level 3 (Context Sanitizer & Fencing), Level 4 (Secure LLM Generation), and Level 5 (Output Secret Redaction).
+    - Removed clearance assumptions from Section 1 and Section 2.
+    - Aligned local model to `llama3.2` across Section 2 matrix, Section 4 diagram, and Section 6.
+    - Updated Layer 5 and SecretDetector to specify 10 Regex Patterns + Shannon Entropy ($H \ge 4.5$).
+    - Updated Pillar 4 to reflect all three defense stages: Input ($\approx 52\%$), Context ($\approx 42\%$), and Output ($\approx 6\%$), summing to $100.0\%$.
+    - Removed `Mean Vector Cosine Score` from Pillar 3 and added latency breakdown explanation.
+  - Re-compiled [`methodology.pdf`](../methodology.pdf) using [`scripts/convert_to_pdf.py`](../scripts/convert_to_pdf.py).
+  - Verified 5-page publication layout with zero RBAC mentions and clean typography.

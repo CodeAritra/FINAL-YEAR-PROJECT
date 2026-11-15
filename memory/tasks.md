@@ -32,6 +32,7 @@
 | `TASK-025` | Remove Benign QA Acc, Refusal Acc Fix & Parameterless Redis Secret Redaction | Architect / QA | P0 | `Completed` | Removed Benign QA Acc from terminal, Markdown, and Subplot 2; corrected Refusal Accuracy to require affirmative refusal strings; updated Database Connection URI regex for parameterless Redis strings; regenerated 122358 report & charts |
 | `TASK-026` | Standalone Markdown-to-Chart Generator & Demo MD | Developer / Curator | P0 | `Completed` | Implemented `scripts/render_charts_from_md.py` and `python main.py chart <file.md>` rendering 4 individual charts + 1 combined 2x2 figure from any benchmark Markdown file; created `demo_tables.md` |
 | `TASK-027` | Comprehensive Master Landing Guide (landing.md) | Documentation Curator | P0 | `Completed` | Authored `landing.md` detailing architecture tree, metric formulas, viva Q&A defense rationale, tools breakdown, and CLI instructions in simple, pointwise language |
+| `TASK-028` | PDF Export of Research Master Guides (learning.pdf & methodology.pdf) | Documentation Curator | P1 | `Completed` | Generalized `scripts/convert_to_pdf.py` producing publication-grade `learning.pdf` and `methodology.pdf` with running headers, footers, math typesetting, and balanced page layout |
 
 ---
 
