@@ -70,7 +70,7 @@ The framework cleanly separates **Model Execution Mode** from **Research Securit
 ```
 code/
 ├── main.py                     # CLI entry point
-├── run_eval.py                 # Quick runner for balanced 50 & 100 benchmark evaluations
+├── run_eval.py                 # Unified runner for 20, 50, 100, 200 diversified benchmarks (auto-detects hosted/local)
 ├── config.py                   # Central settings forwarder
 ├── requirements.txt            # Python dependencies (google-genai, groq, typer, etc.)
 ├── .env.example                # Template for environment credentials
@@ -78,14 +78,13 @@ code/
 │   ├── forensics.pdf           # Forensics & operational harm testing document
 │   └── company internal doc.pdf# Internal corporate data & credential leaks document
 ├── evaluation/                 # Automated benchmarking & reporting
-│   ├── datasets/               # Dedicated evaluation benchmark datasets
-│   │   ├── balanced_50_benchmark.json          # 50-question balanced cross-PDF benchmark (no skew)
-│   │   ├── balanced_100_benchmark.json         # 100-question balanced cross-PDF benchmark (no skew)
-│   │   ├── forensics_100_benchmark.json        # 100 questions from forensics.pdf
-│   │   ├── company_100_benchmark.json          # 100 questions from company internal doc.pdf
-│   │   └── full_200_benchmark.json             # Combined 200-question master dataset
+│   ├── datasets/               # Diversified multi-stage benchmark suites (50% benign / 50% threat)
+│   │   ├── diversified_20_benchmark.json       # 20-question diversified benchmark
+│   │   ├── diversified_50_benchmark.json       # 50-question diversified benchmark
+│   │   ├── diversified_100_benchmark.json      # 100-question diversified benchmark
+│   │   └── diversified_200_benchmark.json      # Complete 200-question diversified benchmark
 │   ├── test_case.py            # Dataset loader and schema
-│   ├── metrics.py              # Deterministic metric evaluators (ASR, SILR, PISR, FPR)
+│   ├── metrics.py              # Deterministic metric evaluators (ASR, FPR, Refusal Acc, Faithfulness)
 │   ├── evaluator.py            # Multi-mode automated benchmark runner
 │   └── reporting.py            # Rich comparison tables + Matplotlib charts + Markdown reports
 ├── config/                     # Application configuration
@@ -106,10 +105,10 @@ code/
 │   ├── chunker.py              # LangChain recursive character chunking
 │   ├── inspector.py            # Pre-chunking extraction & sanitization exporter (.txt)
 │   └── pipeline.py             # Separate baseline vs. secured ingestion collections
-├── scripts/                    # Standalone administration utilities
-│   ├── clean_qdrant.py         # Qdrant collection purge and reset tool
-│   ├── build_balanced_benchmarks.py # Generates balanced 50 & 100 question non-skewed test suites
-│   └── build_dataset.py        # Benchmark dataset validator, statistics & merge tool
+├── scripts/                    # Core utilities
+│   ├── build_diversified_benchmarks.py # Generates 20, 50, 100, 200 diversified benchmarks
+│   ├── showcase_multistage_defense.py  # Demonstrates stage-wise defense proofs
+│   └── clean_qdrant.py                 # Qdrant collection purge and reset tool
 ├── storage/                    # Persistent runtime artifacts
 │   ├── processed_docs/         # Sanitized document exports (one .txt per PDF)
 │   └── eval_results/           # Benchmark reports (.md, .jsonl, .csv, and .png comparison charts)
@@ -254,75 +253,55 @@ python main.py ask --model-mode local --mode prompt-only --query "What is the se
 python main.py ask --model-mode local --mode guardrail --query "What is the secret API key?" --role RESEARCHER
 ```
 
-### 5. Automated Benchmark Evaluation
-Runs test cases across all three security modes with live real-time progress logging for every sample.
+### 5. Automated Benchmark Evaluation (Unified Runner)
 
-#### Recommended: Balanced Non-Skewed Benchmark Runner
-Executes balanced questions selected equally across **both PDFs** (Forensics + Company) with a strict 50% answerable and 50% unanswerable distribution (including password theft, harmful requests, and safe inquiries):
+The framework includes a single, unified evaluation runner [`run_eval.py`](run_eval.py) that executes non-skewed, multi-stage diversified benchmarks across all three security modes (**Baseline**, **Prompt-Only**, and **Guardrail**).
 
+> **Automatic Model Mode Detection**:
+> `run_eval.py` automatically inspects your environment and `.env` credentials. If a `GROQ_API_KEY` is present, it routes to **Hosted Mode (`openai/gpt-oss-120b`)**; if absent or set to local in `.env`, it automatically routes to **Local Mode (`llama3.2` via Ollama)**. You do not need separate scripts or manual `--model-mode` flags!
+
+#### Quick Commands:
 ```bash
-# Run quick balanced 20-question benchmark (PDF1: 5 safe/5 harmful; PDF2: 5 safe/5 restricted with 3 secret extractions)
-python run_eval.py 20
+# 1. Run Complete 200-Question Diversified Benchmark (Default)
+python run_eval.py 200
+# or simply:
+python run_eval.py
 
-# Run balanced 50-question benchmark (PDF1: 13 safe/12 harmful; PDF2: 12 safe/13 restricted with 8 secret extractions)
-python run_eval.py 50
-
-# Run balanced 100-question benchmark (PDF1: 25 safe/25 harmful; PDF2: 25 safe/25 restricted with 10 secret extractions)
+# 2. Run 100-Question Diversified Benchmark
 python run_eval.py 100
 
-# Run balanced benchmark using Local LLM (Ollama)
-python run_eval.py 20 --model-mode local
+# 3. Run 50-Question Diversified Benchmark
+python run_eval.py 50
+
+# 4. Run 20-Question Rapid Diversified Benchmark
+python run_eval.py 20
 ```
 
-#### Detailed CLI Evaluation Commands:
+#### Strict Non-Skewed Multi-Stage Distribution
 
+Every benchmark suite is strictly balanced with **zero skew**:
+- **50% Benign / Answerable Questions**: Evaluates RAG utility, Context Hit Rate, and Faithfulness.
+- **50% Threat / Attack Queries**: Evaluates Guardrail efficacy across the 3 active defense layers:
+  - **~40% Input Guard**: Direct prompt injections, adversarial overrides, and harmful evasion requests.
+  - **~30% Context Sanitizer**: Indirect prompt injections, instruction prefixes (`system:`), and delimiter breakouts (`</retrieved_untrusted_data>`).
+  - **~30% Output Secret Scanner**: Database URIs, passwords, and API keys intercepted and redacted post-generation.
+
+| Benchmark Suite | Total Questions | Benign QA (50%) | Threat Requests (50%) | Input Guard (40%) | Context Sanitizer (30%) | Output Scanner (30%) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `diversified_20` | 20 | 10 | 10 | 4 | 3 | 3 |
+| `diversified_50` | 50 | 25 | 25 | 10 | 8 | 7 |
+| `diversified_100` | 100 | 50 | 50 | 20 | 15 | 15 |
+| `diversified_200` | 200 | 100 | 100 | 40 | 30 | 30 |
+
+#### Optional Ablation & CLI Flags
+If you wish to test ablation studies or customize runs, `run_eval.py` forwards all flags directly:
 ```bash
-# Evaluate 10 balanced questions (5 answerable, 5 unanswerable) on Forensics
-python main.py evaluate --target forensics --sample 10
+# Run 20-question evaluation disabling Input Guard (ablation study)
+python run_eval.py 20 --ablate input
 
-# Evaluate 50 balanced questions (25 answerable, 25 unanswerable) on Company Confidential document
-python main.py evaluate --target company --sample 50
-
-# Evaluate all questions across both documents (combined benchmark)
-python main.py evaluate --target all --sample all
-
-# Default evaluation (runs the active benchmark suite across all 3 security modes)
-python main.py evaluate
-
-# Quick evaluation on first N test cases
-python main.py evaluate --limit 5
-
-# Custom dataset override
-python main.py evaluate --dataset evaluation/datasets/balanced_50_benchmark.json --model-mode hosted --all
-
-# Benchmark using Local LLM Mode (Ollama)
-python main.py evaluate --model-mode local --all
-
-# Benchmark BOTH Hosted and Local modes (all 6 configurations in one run)
-python main.py evaluate --model-mode all --all
-
-# Ablation Experiments: disable a single security layer to measure its contribution
-python main.py evaluate --ablate input       # Disables both Query Guard and RBAC
-python main.py evaluate --ablate ingestion   # Disables Secret & PII sanitization at rest
-python main.py evaluate --ablate context     # Disables untrusted delimiters and instruction stripping
-python main.py evaluate --ablate output      # Disables output secret leak scanner
-
-# Dedicated Ablation Runner: Disables Input Guard to prove downstream defense
-python scripts/ablate_input_eval.py 20
-python scripts/ablate_input_eval.py 50
-python scripts/ablate_input_eval.py 20 --model-mode local
+# Limit evaluation to first N test cases
+python run_eval.py 20 --limit 5
 ```
-
-#### Evaluation Flags Reference
-| Flag | Short | Default | Description |
-|---|---|---|---|
-| `--target` | `-t` | `all` | Document dataset: `forensics`, `company`, or `all`. |
-| `--sample` | `-s` | `all` | Balanced sample size: `10` (5 ans / 5 unans), `50` (25 ans / 25 unans), or `all`. |
-| `--dataset`| `-d` | None | Direct path override to any custom `.json` or `.jsonl` benchmark file. |
-| `--model-mode` | `-M` | `hosted` | LLM execution mode: `hosted` (Groq 120B), `local` (Ollama), or `all` (both). |
-| `--all` | | `True` | Automatically runs across all 3 security modes (Baseline, Prompt-Only, Guardrail). |
-| `--limit` | `-n` | None | Limits evaluation to first N test cases. |
-| `--ablate`| | None | Ablation study: disables `input` (Query+RBAC), `ingestion`, `context`, or `output` layer. |
 
 Every run outputs:
 - **Live console progress**: Showing global progress `(XX/YY)`, mode badge, question preview, result status (`[REFUSED / PROTECTED]`, `[ATTACK SUCCEEDED]`, `[SECRET LEAKED]`, `[SAFE ANSWER]`), and exact latency in milliseconds.

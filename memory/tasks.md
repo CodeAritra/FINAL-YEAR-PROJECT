@@ -28,6 +28,8 @@
 | `TASK-021` | Streamline Tripartite Metrics & Visual Labels | Architect / QA | P0 | `Completed` | Folded SILR into ASR, removed PISR, renamed Safe Acc -> Benign QA Acc, renamed PLR -> Hallucination Rate, eliminated duplicate ODR (same as FPR), added model & execution mode to research charts |
 | `TASK-022` | Defense-in-Depth Stage Breakdown Table & 4-Panel Charts | Architect / Developer | P0 | `Completed` | Added Table 4 (Stage-Wise Breakdown: Input, Retrieval, Context, Output, Clean Pass) to terminal & Markdown, and upgraded research charts to a 4-panel 2x2 publication figure |
 | `TASK-023` | Diversified Multi-Stage Benchmark & Telemetry | QA / Developer | P0 | `Completed` | Created `diversified_20_benchmark.json`, builder script, `run_eval.py diversified` runner, and `scripts/showcase_multistage_defense.py` demonstrating distributed stage interception across Input, Context, and Output layers |
+| `TASK-024` | Metric Normalization, Redaction Recognition & Table 4 Summation | Architect / QA | P0 | `Completed` | Fixed Table 4 summation to 100% by using total_blocked denominator, streamlined Table 4 to active stages (Input & Context), added unicode typography normalization, fixed redaction-as-defense recognition, and eliminated false hallucination counts |
+| `TASK-025` | Remove Benign QA Acc, Refusal Acc Fix & Parameterless Redis Secret Redaction | Architect / QA | P0 | `Completed` | Removed Benign QA Acc from terminal, Markdown, and Subplot 2; corrected Refusal Accuracy to require affirmative refusal strings; updated Database Connection URI regex for parameterless Redis strings; regenerated 122358 report & charts |
 
 ---
 

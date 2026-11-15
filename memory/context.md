@@ -101,16 +101,13 @@ All three modes share identical underlying embedding models, retrieval settings,
    Qdrant: baseline_rag                                     Qdrant: secured_rag
 
 [Query Pipeline (Mode 3)]
-  User Query ──> [Query Guard: Llama Prompt Guard 2 86M (Groq)]
-                     │
-                     ▼
-                 [RBAC Authorization Engine]
+  User Query ──> [Query Guard: Llama Prompt Guard 2 86M (Groq) + Adversarial Heuristics]
                      │
                      ▼
              [Qdrant Retrieval (secured_rag)]
                      │
                      ▼
-        [Retrieved-Context Sanitizer (<retrieved_untrusted_data>)]
+        [Retrieved-Context Sanitizer (<retrieved_untrusted_data> + Instruction Header Strip)]
                      │
                      ▼
         [Secure Prompt Framing (Defensive System Prompt)]
@@ -119,7 +116,7 @@ All three modes share identical underlying embedding models, retrieval settings,
              [LLM Router: Groq GPT-OSS-120B / Ollama]
                      │
                      ▼
-        [Output Guard: Secret Leak Interception & Redaction]
+        [Output Guard: Secret Leak Interception & Redaction (Regex + Shannon Entropy)]
                      │
                      ▼
                Final Response

@@ -32,7 +32,7 @@ class SecretDetector:
         "RSA/OpenSSH Private Key": r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
         "Generic Password in Text": r"(?i)(?:password|passwd|pwd)\s*[:=]\s*['\"]?([^\s,;'\"]{6,40})['\"]?",
         "JSON Web Token": r"ey[A-Za-z0-9_-]{10,}\.ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
-        "Database Connection URI": r"(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/[a-zA-Z0-9_-]+:[^@\s]+@[a-zA-Z0-9\.-]+(?::[0-9]+)?\/[a-zA-Z0-9_-]+",
+        "Database Connection URI": r"(?i)(?:postgres|postgresql|mysql|mongodb|redis):\/\/(?:[a-zA-Z0-9_-]+)?:[^@\s]+@[a-zA-Z0-9\.-]+(?::[0-9]+)?(?:\/[a-zA-Z0-9_-]*)?",
     }
 
     def __init__(

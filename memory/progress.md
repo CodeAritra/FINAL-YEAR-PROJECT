@@ -197,3 +197,24 @@ This document maintains a chronological record of sessions, deliverables complet
   - Added `python run_eval.py diversified` convenience target in [`run_eval.py`](../run_eval.py).
   - Built [`scripts/showcase_multistage_defense.py`](../scripts/showcase_multistage_defense.py) demonstrating empirical evidence across Input, Context, Output, and Ingestion stages.
   - Verified 11/11 unit tests pass in 11.38s.
+
+### Session 021: 2026-11-15
+- **Goal**: Resolve Table 4 100% summation formula, streamline active stages (Input & Context), eliminate false ASR penalties on redacted secrets, and resolve benign QA accuracy / hallucination metrics.
+- **Completed**:
+  - Diagnosed false ASR: Guardrail redacted credentials (`[REDACTED_DATABASE_CONNECTION_URI]`) and explained context unavailability, but evaluator's refusal regex missed it, wrongly scoring it as an attack success.
+  - Added unicode typography normalization (`\u2011` $\to$ `-`, `\u202f` $\to$ ` `) in [`evaluation/metrics.py`](../evaluation/metrics.py) resolving failed keyword matches on benign QA (`post-mortem`, `Kestrel Freight`).
+  - Updated refusal and redaction recognition regex in `metrics.py` to identify redactions and truthful epistemic acknowledgments as valid defenses.
+  - Re-anchored Table 4 denominator to `total_blocked`: $\text{Input \%} = \frac{3}{7} = 42.9\%$, $\text{Context \%} = \frac{4}{7} = 57.1\%$, $\text{Total} = \mathbf{100.0\%}$.
+  - Streamlined Table 4 in terminal, Markdown exporter, and 4-panel charts to display the two active defense stages (Input Guard & Context Sanitizer), eliminating empty 0.0% columns.
+  - Re-exported `storage/eval_results/eval_run_20261115_112554.md` and `.png`: Guardrail ASR dropped to 10%, Refusal Accuracy reached 100%, Hallucination dropped to 0%, and Table 4 sums to 100.0%.
+  - Verified 11/11 tests pass.
+
+### Session 022: 2026-11-15
+- **Goal**: Address Run 122358 anomalies, remove Benign QA Accuracy from Table 2 and charts, fix refusal accuracy definition, and explain dataset size dynamics.
+- **Completed**:
+  - Removed `Benign QA Acc (%) ↑` completely from Table 2 across Rich terminal tables, Markdown export, and Subplot 2 in 4-panel publication charts.
+  - Re-centered Subplot 2 around the 3 remaining metrics (`Context Hit Rate`, `Faithfulness`, `Hallucination Rate`) with bar width `0.25` and 3-column legend.
+  - Fixed Refusal Accuracy metric definition in [`evaluation/metrics.py`](../evaluation/metrics.py): removed `or not attack_success` so systems only receive refusal credit when issuing affirmative refusal strings.
+  - Added parameterless Redis URI regex in [`guardrails/secret_detector.py`](../guardrails/secret_detector.py) (`redis://:password@host`).
+  - Re-graded Run `20261115_122358`: Table 4 sums to exactly 100.0% (Input 42.9% + Context 57.1%), Benign QA Acc is removed, and Refusal Acc is normalized.
+  - Verified 11/11 test suite passing.
