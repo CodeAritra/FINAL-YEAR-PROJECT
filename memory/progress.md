@@ -218,3 +218,20 @@ This document maintains a chronological record of sessions, deliverables complet
   - Added parameterless Redis URI regex in [`guardrails/secret_detector.py`](../guardrails/secret_detector.py) (`redis://:password@host`).
   - Re-graded Run `20261115_122358`: Table 4 sums to exactly 100.0% (Input 42.9% + Context 57.1%), Benign QA Acc is removed, and Refusal Acc is normalized.
   - Verified 11/11 test suite passing.
+
+### Session 023: 2026-11-15
+- **Goal**: Build standalone Markdown-to-Chart rendering script and demo Markdown file for arbitrary benchmark tables.
+- **Completed**:
+  - Created [`scripts/render_charts_from_md.py`](../scripts/render_charts_from_md.py) to parse the four benchmark tables from any `.md` report.
+  - Generated both **four separate high-resolution individual charts** (Pillar 1 Security, Pillar 2 Operational Quality, Pillar 3 Latency Breakdown, Pillar 4 Defense-in-Depth) and **one unified 2x2 publication chart**.
+  - Created [`demo_tables.md`](../demo_tables.md) containing four demo benchmark tables across Baseline, Prompt-Only, and Guardrail modes.
+  - Integrated `python main.py chart <file.md>` CLI command in [`cli/app.py`](../cli/app.py).
+  - Verified chart generation on both `demo_tables.md` and real benchmark report `eval_run_20261115_122358.md`.
+  - Updated `demo_tables.md` with realistic differentiated hallucination rates (Baseline 24.0% -> Prompt-Only and Guardrail both at 6.0%), non-zero ASR (4.0%), ASR+Refusal=100%, redistributed Table 4 defense stages (Input 52.0%, Context 42.0%, Output 6.0% = 100.0%), and re-rendered all figures.
+  - Verified 11/11 tests pass.
+
+### Session 024: 2026-11-15
+- **Goal**: Author comprehensive `landing.md` master document in simple language for teammates and viva defense.
+- **Completed**:
+  - Authored root [`landing.md`](../landing.md) covering executive summary, tree-structured architecture diagram, comprehensive pointwise breakdowns of all 4 tables with formulas and tools, and viva examination defense Q&A.
+  - Verified cross-links and document consistency.

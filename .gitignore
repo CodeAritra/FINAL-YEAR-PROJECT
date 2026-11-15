@@ -47,3 +47,10 @@ storage/temp/
 .coverage
 htmlcov/
 
+demo_tables_1_security_efficacy.png
+demo_tables_2_operational_quality.png
+demo_tables_4_defense_in_depth.png
+demo_tables_3_latency_breakdown.png
+demo_tables_combined_comparison_chart.png
+demo_tables.md
+learning.md

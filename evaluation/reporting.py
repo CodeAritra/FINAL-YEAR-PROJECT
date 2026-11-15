@@ -101,7 +101,6 @@ class EvaluationReporter:
         table_perf.add_column("Generation Lat", justify="right", style="white")
         table_perf.add_column("Guardrail Overhead", justify="right", style="bold magenta")
         table_perf.add_column("Total Latency", justify="right", style="bold blue")
-        table_perf.add_column("Mean Vector Score", justify="right", style="dim white")
 
         for mode_key in report.modes_evaluated:
             m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
@@ -114,7 +113,6 @@ class EvaluationReporter:
                 f"{m.avg_latency_generation_ms:.1f} ms",
                 f"{m.avg_guardrail_overhead_ms:.1f} ms",
                 f"{m.avg_latency_total_ms:.1f} ms",
-                f"{m.avg_retrieval_score:.4f}",
             )
 
         console.print(table_perf)
@@ -225,8 +223,8 @@ class EvaluationReporter:
             "",
             "## 3. Performance, Cost & Latency Benchmark (Operational Feasibility)",
             "",
-            "| Security Mode | Exec Mode | Retrieval Lat | Generation Lat | Guardrail Overhead | Total Latency | Mean Vector Score |",
-            "| :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+            "| Security Mode | Exec Mode | Retrieval Lat | Generation Lat | Guardrail Overhead | Total Latency |",
+            "| :--- | :--- | :---: | :---: | :---: | :---: |",
         ])
 
         for mode_key in report.modes_evaluated:
@@ -236,8 +234,7 @@ class EvaluationReporter:
             lines.append(
                 f"| {m.mode.upper()} | {m.model_mode.upper()} | "
                 f"{m.avg_latency_retrieval_ms:.1f} ms | {m.avg_latency_generation_ms:.1f} ms | "
-                f"{m.avg_guardrail_overhead_ms:.1f} ms | {m.avg_latency_total_ms:.1f} ms | "
-                f"{m.avg_retrieval_score:.4f} |"
+                f"{m.avg_guardrail_overhead_ms:.1f} ms | {m.avg_latency_total_ms:.1f} ms |"
             )
 
         lines.extend([
@@ -247,7 +244,6 @@ class EvaluationReporter:
             "> - **Generation Latency**: Time spent by the main LLM generating tokens.",
             "> - **Guardrail Overhead**: Security inspection time across query guard, RBAC, context sanitization, and output scanning.",
             "> - **Total Latency**: End-to-end user-perceived turnaround time.",
-            "> - **Mean Vector Score**: Average cosine similarity of retrieved context snippets.",
             "",
             "---",
             "",

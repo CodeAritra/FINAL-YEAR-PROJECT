@@ -30,6 +30,8 @@
 | `TASK-023` | Diversified Multi-Stage Benchmark & Telemetry | QA / Developer | P0 | `Completed` | Created `diversified_20_benchmark.json`, builder script, `run_eval.py diversified` runner, and `scripts/showcase_multistage_defense.py` demonstrating distributed stage interception across Input, Context, and Output layers |
 | `TASK-024` | Metric Normalization, Redaction Recognition & Table 4 Summation | Architect / QA | P0 | `Completed` | Fixed Table 4 summation to 100% by using total_blocked denominator, streamlined Table 4 to active stages (Input & Context), added unicode typography normalization, fixed redaction-as-defense recognition, and eliminated false hallucination counts |
 | `TASK-025` | Remove Benign QA Acc, Refusal Acc Fix & Parameterless Redis Secret Redaction | Architect / QA | P0 | `Completed` | Removed Benign QA Acc from terminal, Markdown, and Subplot 2; corrected Refusal Accuracy to require affirmative refusal strings; updated Database Connection URI regex for parameterless Redis strings; regenerated 122358 report & charts |
+| `TASK-026` | Standalone Markdown-to-Chart Generator & Demo MD | Developer / Curator | P0 | `Completed` | Implemented `scripts/render_charts_from_md.py` and `python main.py chart <file.md>` rendering 4 individual charts + 1 combined 2x2 figure from any benchmark Markdown file; created `demo_tables.md` |
+| `TASK-027` | Comprehensive Master Landing Guide (landing.md) | Documentation Curator | P0 | `Completed` | Authored `landing.md` detailing architecture tree, metric formulas, viva Q&A defense rationale, tools breakdown, and CLI instructions in simple, pointwise language |
 
 ---
 

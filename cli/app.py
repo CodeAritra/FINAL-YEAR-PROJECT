@@ -484,3 +484,24 @@ def clean(
             force=force,
         )
 
+
+@app.command()
+def chart(
+    markdown_file: Path = typer.Argument(
+        ...,
+        help="Path to evaluation markdown file containing benchmark tables.",
+        exists=True,
+        readable=True,
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Directory to save generated chart PNGs.",
+    ),
+):
+    """Render 4 individual research charts + 1 combined 2x2 publication chart from any benchmark Markdown file."""
+    from scripts.render_charts_from_md import render_all_charts
+    render_all_charts(markdown_file, output_dir=output_dir)
+
+
