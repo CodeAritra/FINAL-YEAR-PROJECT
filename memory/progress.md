@@ -235,3 +235,11 @@ This document maintains a chronological record of sessions, deliverables complet
 - **Completed**:
   - Authored root [`landing.md`](../landing.md) covering executive summary, tree-structured architecture diagram, comprehensive pointwise breakdowns of all 4 tables with formulas and tools, and viva examination defense Q&A.
   - Verified cross-links and document consistency.
+
+### Session 025: 2026-11-15
+- **Goal**: Update model to `llama3.2` across demo data, re-render charts, and integrate Full System High-Level Design (HLD) into `learning.md`.
+- **Completed**:
+  - Renamed model to `llama3.2` and execution mode to `LOCAL` across all 4 tables in [`demo_tables.md`](../demo_tables.md) and [`demo data.md`](../demo%20data.md).
+  - Re-rendered all 4 individual research charts and the combined 2x2 publication figure via `render_charts_from_md.py`.
+  - Added Section 3: High-Level Design (HLD) of the Full System to [`learning.md`](../learning.md) and synchronized with [`landing.md`](../landing.md).
+  - Verified 11/11 tests pass.
