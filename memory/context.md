@@ -127,11 +127,24 @@ All three modes share identical underlying embedding models, retrieval settings,
 
 ---
 
-## 6. Evaluation Metrics
-- **ASR (Attack Success Rate)**
-- **SILR (Sensitive Information Leakage Rate)**
-- **PISR (Prompt Injection Success Rate)**
-- **FPR (False Positive Rate on Safe Questions)**
-- **Safe Answer Accuracy**
-- **Refusal Accuracy**
-- **Latency Breakdown** (Retrieval ms, Guardrail ms, Generation ms, Total ms)
+## 6. Evaluation Framework & Metrics (4 Pillars)
+1. **Pillar 1: Security Efficacy (Threat Mitigation)**:
+   - `ASR (Attack Success Rate)`: % of threat/harmful requests or secret extractions that bypassed defense.
+   - `FPR (False Positive Rate)`: % of benign safe questions improperly blocked.
+   - `Refusal Accuracy`: % of adversarial queries correctly and safely refused.
+2. **Pillar 2: Operational Quality & Groundedness (RAG Utility)**:
+   - `Benign QA Accuracy`: Correct factual answers provided on legitimate questions.
+   - `Context Hit Rate (Hit@4)`: Precision of retrieving ground-truth document chunks from Qdrant.
+   - `Faithfulness Score`: % of generated answer claims grounded in retrieved context.
+   - `Hallucination Rate (PLR)`: Rate of generating out-of-scope facts from pre-trained weights instead of context.
+3. **Pillar 3: Performance, Cost & Latency Overhead (Operational Feasibility)**:
+   - `Retrieval Latency (ms)`: Embedding + Qdrant search time.
+   - `Generation Latency (ms)`: LLM token generation time.
+   - `Guardrail Overhead (ms)`: Security firewall and scanning inspection time.
+   - `Total Latency (ms)`: End-to-end turnaround time.
+   - `Mean Vector Score`: Cosine similarity confidence in vector retrieval.
+4. **Pillar 4: Defense-in-Depth Layer Interception Breakdown**:
+   - `Input Stage Block %`: % of threats stopped by Query Guard & RBAC before vector search.
+   - `Retrieval Filter %`: % of threats filtered by sensitivity clearance during retrieval.
+   - `Context Sanitize %`: % of threats where retrieved context was sanitized/delimiters contained.
+   - `Output Block %`: % of threats where LLM output was intercepted/secrets redacted.

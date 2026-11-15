@@ -89,3 +89,17 @@ This document tracks all significant architectural, architectural pattern, libra
   - Positive: Provides publication-grade comparative evidence proving Multi-Layer Guardrail stops attacks without sacrificing document faithfulness or introducing unacceptable latency overhead (~15–35 ms). Renders 3 separate terminal tables and 3-panel publication figures.
   - Negative: Requires tracking retrieved snippets, similarity scores, and claim-level tokens per evaluation sample.
 
+
+### ADR-005: Streamlined Metrics, Defense-in-Depth Breakdown & 4-Panel Visualization
+- **Date**: 2026-11-14
+- **Status**: Accepted
+- **Deciders**: User, Architect Agent
+- **Context & Problem Statement**: The evaluation framework had metric redundancies (SILR separate from ASR; ODR mathematically identical to FPR; flat 0.0% PISR across semantic threat test cases). Furthermore, evaluators needed to know at which discrete stage attacks were stopped (Input, Retrieval, Context, or Output) without having legends overlap the 100% bars in Matplotlib plots.
+- **Considered Options**:
+  1. Keep all 12 loose metrics across 3 tables and 1x3 squished charts.
+  2. Streamline Pillar 1 & 2 (fold secret leakage into ASR; drop flat PISR; rename Safe Acc $\to$ Benign QA Acc; rename PLR $\to$ Hallucination Rate; drop redundant ODR); add Table 4 measuring Defense-in-Depth layer interception calculated out of threat requests; upgrade chart to a 4-panel $2 \times 2$ grid with extended $y$-headroom ($130\%–135\%$) and centered stage bars.
+- **Decision Outcome**: Option 2.
+- **Consequences**:
+  - Positive: Clean, academically rigorous tables with zero metric redundancy; crystal-clear proof of Defense-in-Depth (showing 100% of attacks neutralized at the input stage or caught downstream during ablation); zero legend overlap on all research figures; dedicated `--ablate input` script (`scripts/ablate_input_eval.py`).
+  - Negative: Requires re-exporting legacy run files to new 4-table schema.
+

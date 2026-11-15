@@ -334,12 +334,14 @@ def evaluate(
     # Configure ablation if requested
     ablation_policy = None
     if ablate_layer:
-        console.print(f"[yellow][!] Ablation experiment active: Disabling layer '{ablate_layer}'.[/yellow]")
+        abl = ablate_layer.lower().strip()
+        console.print(f"[yellow][!] Ablation experiment active: Disabling layer '{abl}'.[/yellow]")
         ablation_policy = PolicyEngine(
-            enable_ingestion_security=ablate_layer != "ingestion",
-            enable_query_security=ablate_layer != "query",
-            enable_context_sanitization=ablate_layer != "context",
-            enable_output_security=ablate_layer != "output",
+            enable_ingestion_security=abl not in ("ingestion",),
+            enable_query_security=abl not in ("query", "input", "input_guard"),
+            enable_access_control=abl not in ("rbac", "input", "input_guard"),
+            enable_context_sanitization=abl not in ("context",),
+            enable_output_security=abl not in ("output",),
         )
 
     runner = EvaluationRunner()

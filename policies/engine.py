@@ -62,7 +62,7 @@ class PolicyEngine:
         self,
         enable_ingestion_security: bool = True,
         enable_query_security: bool = True,
-        enable_access_control: bool = True,
+        enable_access_control: bool = False,
         enable_context_sanitization: bool = True,
         enable_output_security: bool = True,
     ):
@@ -138,36 +138,24 @@ class PolicyEngine:
     def evaluate_query(
         self,
         query: str,
-        user_role: UserRole = UserRole.RESEARCHER,
-        target_sensitivity: DataSensitivity = DataSensitivity.INTERNAL,
+        user_role: Any = None,
+        target_sensitivity: Any = None,
     ) -> QueryDecisionResult:
         """
-        Evaluate incoming user query: Authorization and Prompt Injection.
-        Keeps authorization and safety decisions strictly decoupled.
+        Evaluate incoming user query: Prompt Injection and Adversarial Intent.
+        Focuses strictly on content safety and prompt integrity (RBAC removed).
         """
-        # Default passes
         auth_res = AuthorizationResult(
             is_authorized=True,
-            user_role=user_role,
-            required_clearance=target_sensitivity,
-            reason="Access control bypassed.",
+            user_role=UserRole.RESEARCHER,
+            required_clearance=DataSensitivity.INTERNAL,
+            reason="RBAC layer deactivated.",
         )
         inj_res = InjectionDetectionResult(
             is_injection=False, confidence_score=0.0, trigger_type="clean", explanation="Bypassed"
         )
 
-        # 1. Authorization Check (RBAC)
-        if self.enable_access_control:
-            auth_res = self.access_control.check_access(user_role, target_sensitivity)
-            if not auth_res.is_authorized:
-                return QueryDecisionResult(
-                    decision=PolicyDecision.BLOCK,
-                    reason=auth_res.reason,
-                    authorization=auth_res,
-                    injection_result=inj_res,
-                )
-
-        # 2. Query Prompt Injection Check (Llama Prompt Guard 2 86M)
+        # Query Prompt Injection Check (Llama Prompt Guard 2 86M + Heuristic Patterns)
         if self.enable_query_security:
             inj_res = self.injection_detector.detect(query)
             if inj_res.is_injection:

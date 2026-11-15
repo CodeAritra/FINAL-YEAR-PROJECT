@@ -146,3 +146,54 @@ This document maintains a chronological record of sessions, deliverables complet
   - Balanced 50 questions: 13 Forensics safe + 12 Forensics harmful + 12 Company safe + 13 Company restricted (8 secret extraction + 5 HR/PII).
   - Balanced 20 questions: 5 Forensics safe + 5 Forensics harmful + 5 Company safe + 5 Company restricted (3 secret extraction + 2 HR/PII).
   - Created [`run_eval.py`](../run_eval.py) runner script allowing single-command evaluation execution (`python run_eval.py 20` / `50` / `100`).
+
+### Session 017: 2026-11-14
+- **Goal**: Streamline Tripartite metrics, eliminate metric redundancy, update Markdown exporter and publication charts, and analyze local 200-sample run screenshot.
+- **Completed**:
+  - Folded credential & secret leakage into **ASR (Attack Success Rate)**, eliminating redundant separate `SILR` column.
+  - Removed `PISR (Prompt Injection Success Rate)` from Table 1 and publication charts because test suite consists of domain-specific semantic threats where PISR was flat at 0.0%.
+  - Renamed `Safe Accuracy` $\to$ **`Benign QA Acc (%) ↑`** for academic clarity.
+  - Renamed `Parametric Leakage Rate (PLR)` $\to$ **`Hallucination Rate (%) ↓`**.
+  - Removed `Over-Defense Rate (ODR)` from Table 2 as it is mathematically identical to `False Positive Rate (FPR)`.
+  - Updated 3-panel research charts (`comparison_chart_<timestamp>.png`) to display model name and execution mode on the x-axis tick labels (e.g. `[Hosted: gpt-oss-120b]` or `[Local: llama3.2]`).
+  - Updated [`evaluation/metrics.py`](../evaluation/metrics.py), [`evaluation/reporting.py`](../evaluation/reporting.py), [`README.md`](../README.md), and [`methodology.md`](../methodology.md).
+  - Regenerated `storage/eval_results/eval_run_20261112_084411.md` and verified all 11 unit tests pass.
+
+### Session 018: 2026-11-14
+- **Goal**: Implement Defense-in-Depth Stage-Wise Interception tracking (Table 4) and 4-panel research comparison charts.
+- **Completed**:
+  - Instrumented `SingleEvaluationResult` with `blocked_stage` and `intercepted_by`.
+  - Added stage-tracking fields to `AggregatedMetrics`: `input_blocked_rate`, `retrieval_filtered_rate`, `context_sanitized_rate`, `output_blocked_rate`, and `clean_allowed_rate`.
+  - Added Table 4 (**Defense-in-Depth Layer Interception Benchmark**) to Rich terminal output and Markdown exporter (`eval_run_<timestamp>.md`).
+  - Upgraded research visualization in [`evaluation/reporting.py`](../evaluation/reporting.py) from 1x3 to a 4-panel $2 \times 2$ publication layout:
+    - Subplot 1: Security Efficacy (%)
+    - Subplot 2: Operational Quality (%)
+    - Subplot 3: Latency Breakdown (ms)
+    - Subplot 4: Defense-in-Depth Layer Interception Share (%)
+  - Regenerated Markdown reports and 4-panel figures for runs `20261114_191333` and `20261112_084411`.
+  - Verified 11/11 tests pass.
+
+### Session 019: 2026-11-14
+- **Goal**: Refine Table 4 denominator to threat queries (100% input rate), eliminate Matplotlib legend overlap, build ablation runner, and update documentation.
+- **Completed**:
+  - Re-anchored Table 4 and Subplot 4 stage rates to threat requests: $\text{Input Block Rate} = \frac{\text{Attacks Intercepted at Input}}{\text{Total Threats Tested}} \times 100$ (reaching 100.0% on Guardrail for balanced runs).
+  - Streamlined Table 4: removed `Clean Pass %` and filtered out Baseline/Prompt-Only from stage breakdown to eliminate empty rows.
+  - Resolved Matplotlib legend overlapping data:
+    - Increased $y$-limits with generous headroom: `ylim(0, 130)` on Subplots 1 & 4; `ylim(0, 135)` on Subplot 2; `ylim(0, max_lat * 1.35)` on Subplot 3.
+    - Relocated legends to horizontal top-center headers.
+    - Added value annotations above bars.
+    - Re-centered Subplot 4 around the 4 discrete defense stages on the $x$-axis.
+  - Implemented [`scripts/ablate_input_eval.py`](../scripts/ablate_input_eval.py) and added `--ablate input` flag to bypass Query Guard and RBAC simultaneously.
+  - Recorded ADR-005 in [`memory/decisions.md`](../memory/decisions.md).
+  - Updated [`README.md`](../README.md) and [`memory/context.md`](../memory/context.md).
+
+### Session 020: 2026-11-15
+- **Goal**: Implement diversified multi-stage benchmark dataset and stage interception telemetry across Input, Context, and Output guardrails.
+- **Completed**:
+  - Identified reason for 100% input blockage in standard benchmarks: queries previously had explicit injection tokens or were blocked by RBAC before reaching retrieval.
+  - Added `context_sanitized` and `context_secrets_redacted` telemetry tracking in [`modes/guardrail.py`](../modes/guardrail.py) so context stage sanitization is captured in `security_metadata`.
+  - Updated [`guardrails/secret_detector.py`](../guardrails/secret_detector.py) database URI regex to support `postgresql://` alongside `postgres://`.
+  - Built [`scripts/build_diversified_benchmark.py`](../scripts/build_diversified_benchmark.py) generating [`evaluation/datasets/diversified_20_benchmark.json`](../evaluation/datasets/diversified_20_benchmark.json) with balanced threat distribution: 10 Normal QA (50%), 4 Input Attacks (40%), 3 Context Attacks (30%), 3 Output Secret Extractions (30%).
+  - Added `python run_eval.py diversified` convenience target in [`run_eval.py`](../run_eval.py).
+  - Built [`scripts/showcase_multistage_defense.py`](../scripts/showcase_multistage_defense.py) demonstrating empirical evidence across Input, Context, Output, and Ingestion stages.
+  - Verified 11/11 unit tests pass in 11.38s.

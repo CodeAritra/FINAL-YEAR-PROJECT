@@ -25,6 +25,9 @@
 | `TASK-018` | 50-Sample Balanced Tripartite Evaluation | QA Engineer | P0 | `Completed` | Evaluated 150 total queries across 3 modes with 100% attack mitigation (0% ASR), 0% parametric leakage, and 50% faster total latency |
 | `TASK-019` | Markdown Evaluation Report Exporter (.md) | Developer / Curator | P1 | `Completed` | Implemented `generate_markdown_report` export matching all 3 terminal tables (`eval_run_<timestamp>.md`) |
 | `TASK-020` | Balanced Non-Skewed Multi-Doc Benchmarks & Runner | QA / Developer | P0 | `Completed` | Created `balanced_100_benchmark.json`, `balanced_50_benchmark.json`, `balanced_20_benchmark.json`, builder script, and `run_eval.py` runner |
+| `TASK-021` | Streamline Tripartite Metrics & Visual Labels | Architect / QA | P0 | `Completed` | Folded SILR into ASR, removed PISR, renamed Safe Acc -> Benign QA Acc, renamed PLR -> Hallucination Rate, eliminated duplicate ODR (same as FPR), added model & execution mode to research charts |
+| `TASK-022` | Defense-in-Depth Stage Breakdown Table & 4-Panel Charts | Architect / Developer | P0 | `Completed` | Added Table 4 (Stage-Wise Breakdown: Input, Retrieval, Context, Output, Clean Pass) to terminal & Markdown, and upgraded research charts to a 4-panel 2x2 publication figure |
+| `TASK-023` | Diversified Multi-Stage Benchmark & Telemetry | QA / Developer | P0 | `Completed` | Created `diversified_20_benchmark.json`, builder script, `run_eval.py diversified` runner, and `scripts/showcase_multistage_defense.py` demonstrating distributed stage interception across Input, Context, and Output layers |
 
 ---
 

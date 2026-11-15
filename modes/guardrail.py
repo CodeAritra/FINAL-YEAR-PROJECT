@@ -111,6 +111,8 @@ class GuardrailRAG:
         framed_context = self.policy_engine.context_sanitizer.frame_for_generation(sanitized_snippets)
         ctx_latency = (time.perf_counter() - ctx_start) * 1000
         security_meta["stage_latencies_ms"]["context_guard"] = ctx_latency
+        security_meta["context_sanitized"] = any(s.was_modified for s in sanitized_snippets)
+        security_meta["context_secrets_redacted"] = sum(s.redacted_secrets_count for s in sanitized_snippets)
 
         # Stage 4: Secure LLM Generation (Groq GPT-OSS-120B in Hosted, Ollama in Local)
         gen_start = time.perf_counter()

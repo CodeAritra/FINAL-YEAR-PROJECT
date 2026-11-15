@@ -234,28 +234,24 @@ To overcome this limitation, this research establishes the **Tripartite Evaluati
 
 ### Pillar 1: Security Efficacy Metrics (Threat Mitigation)
 1. **Attack Success Rate (ASR) [$\downarrow$ Lower is Better]**:
-   $$\text{ASR} = \frac{\sum \mathbb{I}(\text{Harmful or Adversarial Request Executed})}{\text{Total Threat Requests Tested}} \times 100$$
-2. **Sensitive Information Leakage Rate (SILR) [$\downarrow$ Lower is Better]**:
-   $$\text{SILR} = \frac{\sum \mathbb{I}(\text{Target Secret or Credential Leaked})}{\text{Total Secret Extraction Probes}} \times 100$$
-3. **Prompt Injection Success Rate (PISR) [$\downarrow$ Lower is Better]**:
-   $$\text{PISR} = \frac{\sum \mathbb{I}(\text{System Instruction or Persona Overridden})}{\text{Total Prompt Injection Attacks}} \times 100$$
-4. **False Positive Rate (FPR) [$\downarrow$ Lower is Better]**:
+   $$\text{ASR} = \frac{\sum \mathbb{I}(\text{Threat Request Executed or Restricted Secret Leaked})}{\text{Total Threat Requests Tested}} \times 100$$
+   *Note*: Unifies both harmful operational instructions, system overrides, and credential/secret extraction into a single standardized vulnerability rate.
+2. **False Positive Rate (FPR) [$\downarrow$ Lower is Better]**:
    $$\text{FPR} = \frac{\sum \mathbb{I}(\text{Safe, Legitimate Query Improperly Refused})}{\text{Total Safe Queries Tested}} \times 100$$
-5. **Refusal Accuracy [$\uparrow$ Higher is Better]**:
+3. **Refusal Accuracy [$\uparrow$ Higher is Better]**:
    $$\text{Refusal Accuracy} = \frac{\sum \mathbb{I}(\text{Adversarial Query Correctly Refused})}{\text{Total Adversarial Queries Tested}} \times 100$$
 
 ### Pillar 2: Operational Quality & Groundedness Metrics (RAG Utility)
-1. **Safe Answer Accuracy [$\uparrow$ Higher is Better]**:
-   $$\text{Safe Acc} = \frac{\sum \mathbb{I}(\text{Safe Query Answered Correctly with Required Facts})}{\text{Total Safe Queries Tested}} \times 100$$
+1. **Benign QA Accuracy [$\uparrow$ Higher is Better]**:
+   $$\text{Benign QA Acc} = \frac{\sum \mathbb{I}(\text{Safe Query Answered Correctly with Required Facts})}{\text{Total Safe Queries Tested}} \times 100$$
 2. **Context Hit Rate (Hit@4) [$\uparrow$ Higher is Better]**:
    $$\text{Hit@4} = \frac{1}{N} \sum_{i=1}^N \mathbb{I}(\text{Relevant Ground-Truth Snippet} \in \text{Top-4 Retrieved Chunks})$$
 3. **Context Faithfulness / Groundedness Score [$\uparrow$ Higher is Better]**:
    Measures the token-level groundedness of non-refusal model answers against retrieved context:
    $$\text{Faithfulness} = \frac{|\text{Content Tokens in Answer Grounded in Retrieved Chunks}|}{|\text{Total Content Tokens in Answer}|} \times 100$$
-4. **Parametric Leakage Rate [$\downarrow$ Lower is Better]**:
-   Quantifies how often the LLM answers out-of-scope or unanswerable queries using pre-trained parametric weights instead of bounding answers to provided documents.
-5. **Over-Defense Rate (ODR) [$\downarrow$ Lower is Better]**:
-   Measures the frequency of legitimate inquiries blocked due to over-sensitive guardrail classification ($\text{ODR} \equiv \text{FPR}$).
+4. **Hallucination Rate (Parametric Leakage) [$\downarrow$ Lower is Better]**:
+   Quantifies how often the LLM answers out-of-scope or unanswerable queries by hallucinating ungrounded facts from pre-trained parametric weights instead of bounding answers to provided documents.
+   *Note*: Over-Defense Rate (ODR) is mathematically identical to False Positive Rate (FPR) and is reported under Pillar 1 to eliminate redundancy.
 
 ### Pillar 3: Performance, Cost & Latency Overhead (Operational Feasibility)
 1. **Retrieval Latency ($\text{Latency}_{\text{Retrieval}}$)**: Time consumed by Gemini Embedding 2 generation and Qdrant Cloud cosine similarity search.

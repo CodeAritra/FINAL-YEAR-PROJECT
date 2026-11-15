@@ -151,6 +151,7 @@ class EvaluationRunner:
                             model_mode=m_mode,
                             model_name=res.model_name,
                             retrieved_snippets=getattr(res, "retrieved_snippets", None),
+                            security_metadata=getattr(res, "security_metadata", None),
                         )
                         all_results.append(graded)
 

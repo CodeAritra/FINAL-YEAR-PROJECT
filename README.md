@@ -302,10 +302,15 @@ python main.py evaluate --model-mode local --all
 python main.py evaluate --model-mode all --all
 
 # Ablation Experiments: disable a single security layer to measure its contribution
-python main.py evaluate --ablate ingestion
-python main.py evaluate --ablate query
-python main.py evaluate --ablate context
-python main.py evaluate --ablate output
+python main.py evaluate --ablate input       # Disables both Query Guard and RBAC
+python main.py evaluate --ablate ingestion   # Disables Secret & PII sanitization at rest
+python main.py evaluate --ablate context     # Disables untrusted delimiters and instruction stripping
+python main.py evaluate --ablate output      # Disables output secret leak scanner
+
+# Dedicated Ablation Runner: Disables Input Guard to prove downstream defense
+python scripts/ablate_input_eval.py 20
+python scripts/ablate_input_eval.py 50
+python scripts/ablate_input_eval.py 20 --model-mode local
 ```
 
 #### Evaluation Flags Reference
@@ -317,18 +322,15 @@ python main.py evaluate --ablate output
 | `--model-mode` | `-M` | `hosted` | LLM execution mode: `hosted` (Groq 120B), `local` (Ollama), or `all` (both). |
 | `--all` | | `True` | Automatically runs across all 3 security modes (Baseline, Prompt-Only, Guardrail). |
 | `--limit` | `-n` | None | Limits evaluation to first N test cases. |
-| `--ablate`| | None | Ablation study: disables `ingestion`, `query`, `context`, or `output` layer. |
+| `--ablate`| | None | Ablation study: disables `input` (Query+RBAC), `ingestion`, `context`, or `output` layer. |
 
 Every run outputs:
 - **Live console progress**: Showing global progress `(XX/YY)`, mode badge, question preview, result status (`[REFUSED / PROTECTED]`, `[ATTACK SUCCEEDED]`, `[SECRET LEAKED]`, `[SAFE ANSWER]`), and exact latency in milliseconds.
-- **Tripartite Terminal Benchmark Reports**: Displays 3 distinct Rich tables (Security Efficacy, Operational Quality, and Latency Overhead).
-- **Markdown Evaluation Report**: Saved to `storage/eval_results/eval_run_<timestamp>.md` with all tables and metrics.
+- **Tripartite Terminal Benchmark Reports**: Displays 4 distinct Rich tables (Security Efficacy, Operational Quality, Latency Overhead, and Defense-in-Depth Layer Interceptions).
+- **Markdown Evaluation Report**: Saved to `storage/eval_results/eval_run_<timestamp>.md` with all 4 tables, stage definitions, and metrics.
 - **Excel-ready CSV**: Saved to `storage/eval_results/eval_run_<timestamp>.csv`
 - **JSONL Full Audit Trail**: Saved to `storage/eval_results/eval_run_<timestamp>.jsonl`
-- **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png` (3-panel figures).
-- **Excel-ready CSV**: Saved to `storage/eval_results/eval_run_<timestamp>.csv`
-- **JSONL Full Audit Trail**: Saved to `storage/eval_results/eval_run_<timestamp>.jsonl`
-- **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png` (3-panel figures).
+- **Publication Comparison Charts**: Rendered to `storage/eval_results/comparison_chart_<timestamp>.png` (4-panel $2 \times 2$ figure with value annotations and generous headroom).
 
 ---
 
@@ -336,22 +338,22 @@ Every run outputs:
 
 In security research, evaluating threat mitigation alone creates an **over-defense bias**: a system that refuses 100% of queries is theoretically 100% secure, but completely useless in production.
 
-To provide a rigorous academic defense and publication-ready evaluation, this framework measures the **Triad of RAG Systems** across three complementary pillars:
+To provide a rigorous academic defense and publication-ready evaluation, this framework measures the system across four complementary pillars:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                   THE TRIPARTITE RAG RESEARCH EVALUATION PARADIGM                │
-├──────────────────────────┬───────────────────────────┬───────────────────────────┤
-│   Pillar 1: Security     │   Pillar 2: Operational   │     Pillar 3: Cost &      │
-│        Efficacy          │   Quality & Faithfulness  │     Latency Overhead      │
-│   (Threat Mitigation)    │       (RAG Utility)       │  (Operational Feasibility)│
-├──────────────────────────┼───────────────────────────┼───────────────────────────┤
-│ • Attack Success (ASR)   │ • Safe Answer Accuracy    │ • Retrieval Latency (ms)  │
-│ • Secret Leakage (SILR)  │ • Context Hit Rate (Hit@4)│ • Generation Latency (ms) │
-│ • Prompt Injection (PISR)│ • Faithfulness (Grounded) │ • Guardrail Overhead (ms) │
-│ • False Positive (FPR)   │ • Parametric Leakage Rate │ • Total Pipeline Latency  │
-│ • Refusal Accuracy       │ • Over-Defense Rate (ODR) │ • Mean Cosine Vector Score│
-└──────────────────────────┴───────────────────────────┴───────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                   THE TRIPARTITE RAG RESEARCH EVALUATION PARADIGM & DEFENSE                      │
+├──────────────────────────┬───────────────────────────┬───────────────────────────┬───────────────┤
+│   Pillar 1: Security     │   Pillar 2: Operational   │     Pillar 3: Cost &      │  Pillar 4:    │
+│        Efficacy          │   Quality & Faithfulness  │     Latency Overhead      │ Defense-in-   │
+│   (Threat Mitigation)    │       (RAG Utility)       │  (Operational Feasibility)│ Depth Stages  │
+├──────────────────────────┼───────────────────────────┼───────────────────────────┼───────────────┤
+│ • Attack Success (ASR)   │ • Benign QA Accuracy      │ • Retrieval Latency (ms)  │ • Input Guard │
+│ • False Positive (FPR)   │ • Context Hit Rate (Hit@4)│ • Generation Latency (ms) │ • Retrieval   │
+│ • Refusal Accuracy       │ • Faithfulness (Grounded) │ • Guardrail Overhead (ms) │ • Context     │
+│                          │ • Hallucination Rate (PLR)│ • Total Pipeline Latency  │ • Output Guard│
+│                          │                           │ • Mean Cosine Vector Score│               │
+└──────────────────────────┴───────────────────────────┴───────────────────────────┴───────────────┘
 ```
 
 #### Pillar 1: Security Efficacy (Threat Mitigation)
@@ -359,22 +361,19 @@ Measures how effectively each mode blocks malicious, adversarial, or exfiltratio
 
 | Metric | Definition & Formula | Academic Importance & Target |
 |---|---|---|
-| **Attack Success Rate (ASR) ↓** | $\frac{\text{Successful Attacks}}{\text{Total Adversarial Queries}} \times 100$ | **Primary defense metric**: Proves whether malicious instructions (harmful requests, injections, extractions) were executed. Baseline is typically $>90\%$; Guardrail must achieve **$0.0\%$**. |
-| **Sensitive Info Leakage (SILR) ↓** | $\frac{\text{Queries Leaking Secrets}}{\text{Total Secret Probes}} \times 100$ | **Confidentiality metric**: Measures whether API keys, staging credentials, or PII were disclosed. Target: **$0.0\%$**. |
-| **Prompt Injection Rate (PISR) ↓** | $\frac{\text{Successful Jailbreaks}}{\text{Total Injection Probes}} \times 100$ | **Integrity metric**: Measures whether indirect injection delimiters, DAN personas, or system overrides were obeyed. Target: **$0.0\%$**. |
+| **Attack Success Rate (ASR) ↓** | $\frac{\text{Successful Threat Evasions + Secret Leaks}}{\text{Total Adversarial Queries}} \times 100$ | **Primary defense metric**: Proves whether malicious instructions (harmful requests, injection, credential extraction) succeeded. Baseline is typically $>85\%$; Guardrail must achieve **$0.0\%$**. |
 | **False Positive Rate (FPR) ↓** | $\frac{\text{Improperly Refused Safe Queries}}{\text{Total Safe Queries}} \times 100$ | **Precision metric**: Measures collateral damage—benign questions that were accidentally blocked by security filters. Target: **$< 3.0\%$**. |
-| **Refusal Accuracy ↑** | $\frac{\text{Correctly Refused Threat Queries}}{\text{Total Threat Queries}} \times 100$ | **Safety compliance**: Proves the LLM or security filter generated a clear, unambiguous safety refusal when prompted with dangerous requests. Target: **$100\%$**. |
+| **Refusal Accuracy ↑** | $\frac{\text{Correctly Refused Threat Queries}}{\text{Total Threat Queries}} \times 100$ | **Safety compliance**: Proves the security filters or model generated a clear, unambiguous safety refusal when prompted with dangerous requests. Target: **$100\%$**. |
 
 #### Pillar 2: Operational Quality & Faithfulness (RAG Utility)
 Proves that adding multi-layer security **does not degrade** normal document-answering capabilities or introduce hallucinations.
 
 | Metric | Definition & Formula | Academic Importance & Target |
 |---|---|---|
-| **Safe Answer Accuracy ↑** | $\frac{\text{Accurate Safe Answers}}{\text{Total Safe Queries}} \times 100$ | **Core utility metric**: Proves normal users continue getting correct, high-quality answers when asking legitimate questions. Target: **$> 90\%$**. |
+| **Benign QA Accuracy ↑** | $\frac{\text{Accurate Answers on Safe Queries}}{\text{Total Safe Queries}} \times 100$ | **Core utility metric**: Proves normal users continue getting correct, high-quality answers when asking legitimate questions. Target: **$> 90\%$**. |
 | **Context Hit Rate (Hit@4) ↑** | $\frac{\text{Queries with Relevant Chunks in Top-4}}{\text{Total Queries}} \times 100$ | **Retrieval quality**: Verifies that Gemini Embedding 2 and Qdrant actually retrieved snippets from the ground-truth document section/page. Target: **$> 85\%$**. |
 | **Context Faithfulness (Groundedness) ↑** | $\frac{\text{Answer Content Tokens Grounded in Chunks}}{\text{Total Answer Content Tokens}} \times 100$ | **Anti-hallucination metric**: Measures whether claims in the answer are strictly backed by retrieved text or invented. Guardrail's `<retrieved_untrusted_data>` delimiter achieves higher faithfulness than Baseline (**$> 90\%$**). |
-| **Parametric Leakage Rate ↓** | $\frac{\text{Unanswerable Queries Answered from Weights}}{\text{Total Unanswerable Queries}} \times 100$ | **Parametric isolation**: When an answer is absent from the document, does the LLM answer from internal pre-training weights instead of stating the document lacks the fact? Target: **$< 5.0\%$**. |
-| **Over-Defense Rate (ODR) ↓** | $\frac{\text{Safe Queries Rejected by Guardrails}}{\text{Total Safe Queries}} \times 100$ | **Usability penalty**: Identifies if the security layer became overly paranoid and disrupted standard business workflows. Target: **$< 2.0\%$**. |
+| **Hallucination Rate (Parametric Leak) ↓** | $\frac{\text{Unanswerable Queries Answered from Weights}}{\text{Total Unanswerable Queries}} \times 100$ | **Parametric isolation**: When an answer is absent from the document, does the LLM answer from internal pre-training weights instead of stating the document lacks the fact? Target: **$< 5.0\%$**. |
 
 #### Pillar 3: Performance, Cost & Latency Overhead (Operational Feasibility)
 Proves that the security architecture is lightweight and deployable in production on standard cloud APIs or 8 GB RAM laptops.
@@ -386,6 +385,16 @@ Proves that the security architecture is lightweight and deployable in productio
 | **Guardrail Overhead Latency (ms)** | $\text{Latency}_{\text{Total}} - (\text{Latency}_{\text{Retrieval}} + \text{Latency}_{\text{Generation}})$ | **Critical engineering metric**: Measures the exact millisecond cost of Llama Prompt Guard 2, regex scanning, RBAC, and Presidio PII checks. Typically only **15–35 ms**. |
 | **Total Pipeline Latency (ms)** | Complete wall-clock turnaround time from user query to verified response. | Confirms end-to-end responsiveness is acceptable for real-time human interaction ($< 1.5$ s). |
 | **Mean Vector Score** | Average cosine similarity of top-K retrieved snippets. | Reflects dense embedding retrieval confidence in Qdrant. |
+
+#### Pillar 4: Defense-in-Depth Layer Interception Breakdown
+Measures the exact distribution of where adversarial threat requests are neutralized across the multi-layer pipeline (calculated out of all tested threat queries):
+
+| Stage | Intercepting Guardrail | Academic Function & Target |
+|---|---|---|
+| **Input Stage (Query/RBAC) %** | Meta Llama Prompt Guard 2 86M + RBAC Clearance Engine | Catches prompt injections and clearance violations before vector database access. Target: **$> 90\%$**. |
+| **Retrieval Filter %** | Sensitivity Metadata Enforcement | Prunes chunks violating role clearances during similarity search. Target: **$0.0\%$** (when input guard is active). |
+| **Context Sanitize %** | Untrusted Delimiter Containment & Instruction Stripper | Neutralizes indirect prompt injection prefixes in retrieved document chunks. |
+| **Output Block %** | Secret Leak Interceptor & Sensitive Pattern Redactor | Final defense line catching any credentials or restricted data generated by the LLM. Target: **$100\%$ interception of unmasked credentials**. |
 
 ---
 

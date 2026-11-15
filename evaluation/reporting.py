@@ -39,8 +39,6 @@ class EvaluationReporter:
         table_sec.add_column("Exec Mode", style="yellow")
         table_sec.add_column("Main Model", style="dim white")
         table_sec.add_column("ASR (%) ↓", justify="right", style="bold red")
-        table_sec.add_column("SILR (%) ↓", justify="right", style="bright_red")
-        table_sec.add_column("PISR (%) ↓", justify="right", style="bright_yellow")
         table_sec.add_column("FPR (%) ↓", justify="right", style="yellow")
         table_sec.add_column("Refusal Acc (%) ↑", justify="right", style="bold green")
 
@@ -53,14 +51,12 @@ class EvaluationReporter:
                 m.model_mode.upper(),
                 m.model_name[:20],
                 f"{m.attack_success_rate:.1f}%",
-                f"{m.sensitive_info_leakage_rate:.1f}%",
-                f"{m.prompt_injection_success_rate:.1f}%",
                 f"{m.false_positive_rate:.1f}%",
                 f"{m.refusal_accuracy:.1f}%",
             )
 
         console.print(table_sec)
-        console.print("[dim]  Note: ASR = Attack Success Rate, SILR = Secret Leakage, PISR = Prompt Injection, FPR = False Positives[/dim]\n")
+        console.print("[dim]  Note: ASR = Attack Success Rate (covers harmful evasion & secret leakage), FPR = False Positive Rate, Refusal Acc = Proper Refusal[/dim]\n")
 
         # ---------------------------------------------------------
         # Table 2: Operational Quality & Groundedness Report (Pillar 2)
@@ -72,11 +68,10 @@ class EvaluationReporter:
         table_qual.add_column("Security Mode", style="cyan", no_wrap=True)
         table_qual.add_column("Exec Mode", style="yellow")
         table_qual.add_column("Main Model", style="dim white")
-        table_qual.add_column("Safe Acc (%) ↑", justify="right", style="bold green")
+        table_qual.add_column("Benign QA Acc (%) ↑", justify="right", style="bold green")
         table_qual.add_column("Context Hit Rate ↑", justify="right", style="cyan")
         table_qual.add_column("Faithfulness (%) ↑", justify="right", style="bold cyan")
-        table_qual.add_column("Parametric Leak ↓", justify="right", style="bold red")
-        table_qual.add_column("Over-Defense (ODR) ↓", justify="right", style="yellow")
+        table_qual.add_column("Hallucination Rate (%) ↓", justify="right", style="bold red")
 
         for mode_key in report.modes_evaluated:
             m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
@@ -86,15 +81,14 @@ class EvaluationReporter:
                 m.mode.upper(),
                 m.model_mode.upper(),
                 m.model_name[:20],
-                f"{m.safe_answer_accuracy:.1f}%",
+                f"{m.benign_qa_accuracy:.1f}%",
                 f"{m.context_hit_rate:.1f}%",
                 f"{m.avg_faithfulness:.1f}%",
-                f"{m.parametric_leakage_rate:.1f}%",
-                f"{m.over_defense_rate:.1f}%",
+                f"{m.hallucination_rate:.1f}%",
             )
 
         console.print(table_qual)
-        console.print("[dim]  Note: Faithfulness = Claim Grounding in Chunks, Parametric Leak = Answering Out-of-Scope from Weights[/dim]\n")
+        console.print("[dim]  Note: Benign QA Acc = Correct factual answers on normal queries, Faithfulness = Grounded in chunks, Hallucination Rate = Out-of-scope guesses[/dim]\n")
 
         # ---------------------------------------------------------
         # Table 3: Performance, Cost & Latency Report (Pillar 3)
@@ -128,6 +122,41 @@ class EvaluationReporter:
         console.print(table_perf)
         console.print(f"[dim]Total test samples evaluated: {report.total_test_cases} | Results saved to: {report.jsonl_output_path}[/dim]\n")
 
+        # ---------------------------------------------------------
+        # Table 4: Defense-in-Depth Layer Interception Report (Pillar 4)
+        # ---------------------------------------------------------
+        table_stages = Table(
+            title="[bold magenta]4. Defense-in-Depth Layer Interception Benchmark (Stage-Wise Breakdown)[/bold magenta]",
+            header_style="bold magenta",
+        )
+        table_stages.add_column("Security Mode", style="cyan", no_wrap=True)
+        table_stages.add_column("Exec Mode", style="yellow")
+        table_stages.add_column("Main Model", style="dim white")
+        table_stages.add_column("Input Stage (Query Guard) %", justify="right", style="bold red")
+        table_stages.add_column("Retrieval Filter %", justify="right", style="yellow")
+        table_stages.add_column("Context Sanitize %", justify="right", style="cyan")
+        table_stages.add_column("Output Block %", justify="right", style="bold red")
+
+        guardrail_modes = [k for k in report.modes_evaluated if "guardrail" in k.lower()]
+        target_stage_modes = guardrail_modes if guardrail_modes else report.modes_evaluated
+
+        for mode_key in target_stage_modes:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            table_stages.add_row(
+                m.mode.upper(),
+                m.model_mode.upper(),
+                m.model_name[:20],
+                f"{m.input_blocked_rate:.1f}%",
+                f"{m.retrieval_filtered_rate:.1f}%",
+                f"{m.context_sanitized_rate:.1f}%",
+                f"{m.output_blocked_rate:.1f}%",
+            )
+
+        console.print(table_stages)
+        console.print("[dim]  Note: Input Block = Stopped by Query Guard before DB; Retrieval Filter = Drop; Output Block = LLM leak stopped[/dim]\n")
+
     @staticmethod
     def generate_markdown_report(report: EvaluationRunReport, output_path: str | Path | None = None) -> str:
         """Generate a comprehensive Markdown report containing the 3 evaluation tables from the terminal."""
@@ -149,8 +178,8 @@ class EvaluationReporter:
             f"",
             f"## 1. Security Efficacy Benchmark (Threat Mitigation)",
             f"",
-            f"| Security Mode | Exec Mode | Main Model | ASR (%) ↓ | SILR (%) ↓ | PISR (%) ↓ | FPR (%) ↓ | Refusal Acc (%) ↑ |",
-            f"| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+            f"| Security Mode | Exec Mode | Main Model | ASR (%) ↓ | FPR (%) ↓ | Refusal Acc (%) ↑ |",
+            f"| :--- | :--- | :--- | :---: | :---: | :---: |",
         ]
 
         for mode_key in report.modes_evaluated:
@@ -159,26 +188,23 @@ class EvaluationReporter:
                 continue
             lines.append(
                 f"| {m.mode.upper()} | {m.model_mode.upper()} | {m.model_name} | "
-                f"{m.attack_success_rate:.1f}% | {m.sensitive_info_leakage_rate:.1f}% | "
-                f"{m.prompt_injection_success_rate:.1f}% | {m.false_positive_rate:.1f}% | "
+                f"{m.attack_success_rate:.1f}% | {m.false_positive_rate:.1f}% | "
                 f"{m.refusal_accuracy:.1f}% |"
             )
 
         lines.extend([
             "",
             "> **Pillar 1 Metric Definitions**:",
-            "> - **ASR (Attack Success Rate)**: Percentage of malicious, harmful, or sensitive requests that bypassed defenses.",
-            "> - **SILR (Sensitive Information Leakage Rate)**: Frequency of unauthorized secrets, credentials, or restricted data exposure.",
-            "> - **PISR (Prompt Injection Success Rate)**: Rate of jailbreak or system instruction overrides.",
-            "> - **FPR (False Positive Rate)**: Percentage of benign questions incorrectly blocked.",
-            "> - **Refusal Accuracy**: Proportion of malicious queries properly refused.",
+            "> - **ASR (Attack Success Rate)**: Percentage of malicious, harmful, or unauthorized requests that bypassed defenses (covers harmful evasion & secret extraction).",
+            "> - **FPR (False Positive Rate)**: Percentage of benign, safe questions incorrectly blocked by security filters.",
+            "> - **Refusal Accuracy**: Proportion of adversarial queries properly identified and refused.",
             "",
             "---",
             "",
             "## 2. Operational Quality & Groundedness Benchmark (RAG Utility)",
             "",
-            "| Security Mode | Exec Mode | Main Model | Safe Acc (%) ↑ | Context Hit Rate ↑ | Faithfulness (%) ↑ | Parametric Leak ↓ | Over-Defense (ODR) ↓ |",
-            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+            "| Security Mode | Exec Mode | Main Model | Benign QA Acc (%) ↑ | Context Hit Rate ↑ | Faithfulness (%) ↑ | Hallucination Rate (%) ↓ |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: |",
         ])
 
         for mode_key in report.modes_evaluated:
@@ -187,19 +213,17 @@ class EvaluationReporter:
                 continue
             lines.append(
                 f"| {m.mode.upper()} | {m.model_mode.upper()} | {m.model_name} | "
-                f"{m.safe_answer_accuracy:.1f}% | {m.context_hit_rate:.1f}% | "
-                f"{m.avg_faithfulness:.1f}% | {m.parametric_leakage_rate:.1f}% | "
-                f"{m.over_defense_rate:.1f}% |"
+                f"{m.benign_qa_accuracy:.1f}% | {m.context_hit_rate:.1f}% | "
+                f"{m.avg_faithfulness:.1f}% | {m.hallucination_rate:.1f}% |"
             )
 
         lines.extend([
             "",
             "> **Pillar 2 Metric Definitions**:",
-            "> - **Safe Accuracy**: Correct answers provided on benign, answerable questions.",
+            "> - **Benign QA Accuracy**: Correct answers provided on normal, answerable questions according to ground truth.",
             "> - **Context Hit Rate**: Precision of retrieving ground-truth document chunks from Qdrant.",
-            "> - **Faithfulness (Groundedness)**: Token-grounding of generated claims supported by retrieved context.",
-            "> - **Parametric Leakage**: Rate of the model hallucinating ungrounded facts from pre-trained weights when context is absent.",
-            "> - **Over-Defense Rate (ODR)**: Legitimate queries refused due to false security boundaries.",
+            "> - **Faithfulness (Groundedness)**: Token-grounding of generated claims directly supported by retrieved context.",
+            "> - **Hallucination Rate**: Rate of the model generating ungrounded facts from pre-trained weights when context is absent.",
             "",
             "---",
             "",
@@ -231,6 +255,35 @@ class EvaluationReporter:
             "",
             "---",
             "",
+            "## 4. Defense-in-Depth Layer Interception Benchmark (Stage-Wise Breakdown)",
+            "",
+            "| Security Mode | Exec Mode | Main Model | Input Stage (Query Guard) % | Retrieval Filter % | Context Sanitize % | Output Block % |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: |",
+        ])
+
+        guardrail_modes = [k for k in report.modes_evaluated if "guardrail" in k.lower()]
+        target_stage_modes = guardrail_modes if guardrail_modes else report.modes_evaluated
+
+        for mode_key in target_stage_modes:
+            m: AggregatedMetrics = report.metrics_by_mode.get(mode_key)
+            if not m:
+                continue
+            lines.append(
+                f"| {m.mode.upper()} | {m.model_mode.upper()} | {m.model_name} | "
+                f"{m.input_blocked_rate:.1f}% | {m.retrieval_filtered_rate:.1f}% | "
+                f"{m.context_sanitized_rate:.1f}% | {m.output_blocked_rate:.1f}% |"
+            )
+
+        lines.extend([
+            "",
+            "> **Pillar 4 Stage Definitions**:",
+            "> - **Input Stage (Query Guard)**: Percentage of requests intercepted at the boundary by Meta Llama Prompt Guard 2 or heuristic patterns before vector retrieval.",
+            "> - **Retrieval Filter**: Queries filtered during vector lookup due to data quarantine or drop.",
+            "> - **Context Sanitize**: Requests where retrieved context chunks had adversarial instructions stripped or secrets masked.",
+            "> - **Output Block**: Responses where the LLM generated restricted content or secrets that were intercepted by the output scanner.",
+            "",
+            "---",
+            "",
             "### Generated Run Artifacts",
             "",
             f"- **Detailed Benchmark Records (JSONL)**: `{Path(report.jsonl_output_path).name}`",
@@ -253,48 +306,87 @@ class EvaluationReporter:
             return ""
 
         metrics_list = [report.metrics_by_mode[m] for m in modes if m in report.metrics_by_mode]
-        labels = [f"{m.mode.title()}\n({m.model_mode})" for m in metrics_list]
+        labels = []
+        for m in metrics_list:
+            short_model = m.model_name.split("/")[-1] if m.model_name else "Unknown"
+            if len(short_model) > 16:
+                short_model = short_model[:14] + "…"
+            exec_str = "Hosted" if m.model_mode.lower() == "hosted" else "Local"
+            labels.append(f"{m.mode.title()}\n[{exec_str}: {short_model}]")
+
         x = range(len(labels))
 
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(max(16, len(labels) * 3.0), 5.5), dpi=300)
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(max(15, len(labels) * 3.6), 11.0), dpi=300)
 
-        # Plot 1: Security Violations (Lower is Better)
-        width = 0.2
+        # Plot 1: Security Efficacy (ASR & FPR Lower is Better, Refusal Higher is Better)
+        width = 0.25
         asrs = [m.attack_success_rate for m in metrics_list]
-        silrs = [m.sensitive_info_leakage_rate for m in metrics_list]
-        pisrs = [m.prompt_injection_success_rate for m in metrics_list]
+        refusals = [m.refusal_accuracy for m in metrics_list]
         fprs = [m.false_positive_rate for m in metrics_list]
 
-        ax1.bar([i - 1.5 * width for i in x], asrs, width=width, label="Attack Success (ASR)", color="#e63946")
-        ax1.bar([i - 0.5 * width for i in x], silrs, width=width, label="Info Leakage (SILR)", color="#f4a261")
-        ax1.bar([i + 0.5 * width for i in x], pisrs, width=width, label="Prompt Injection (PISR)", color="#e76f51")
-        ax1.bar([i + 1.5 * width for i in x], fprs, width=width, label="False Positives (FPR)", color="#2a9d8f")
+        b1 = ax1.bar([i - width for i in x], asrs, width=width, label="Attack Success (ASR) ↓", color="#e63946")
+        b2 = ax1.bar([i for i in x], refusals, width=width, label="Refusal Accuracy ↑", color="#2a9d8f")
+        b3 = ax1.bar([i + width for i in x], fprs, width=width, label="False Positives (FPR) ↓", color="#f4a261")
 
-        ax1.set_title("1. Security Violations (%) [Lower is Better]", fontsize=10, fontweight="bold")
+        # Value labels for Plot 1
+        for bars in (b1, b2, b3):
+            for bar in bars:
+                h = bar.get_height()
+                if h > 0:
+                    ax1.annotate(
+                        f"{h:.0f}%",
+                        xy=(bar.get_x() + bar.get_width() / 2, h),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha="center",
+                        va="bottom",
+                        fontsize=7,
+                        fontweight="bold",
+                    )
+
+        ax1.set_title("1. Security Efficacy (%) [ASR/FPR: ↓ | Refusal: ↑]", fontsize=10, fontweight="bold", pad=12)
         ax1.set_xticks(x)
         ax1.set_xticklabels(labels, fontweight="bold", fontsize=8)
-        ax1.set_ylabel("Violation Rate (%)")
-        ax1.set_ylim(0, 105)
+        ax1.set_ylabel("Percentage (%)")
+        ax1.set_ylim(0, 130)  # Generous headroom to prevent legend overlap
         ax1.grid(axis="y", linestyle="--", alpha=0.5)
-        ax1.legend(loc="upper right", fontsize=7)
+        ax1.legend(loc="upper center", bbox_to_anchor=(0.5, 0.98), ncol=3, fontsize=7.5, framealpha=0.9)
 
-        # Plot 2: Operational Quality & Groundedness (Higher is Better)
-        w2 = 0.25
-        safe_accs = [m.safe_answer_accuracy for m in metrics_list]
+        # Plot 2: Operational Quality & Groundedness
+        w2 = 0.20
+        benign_accs = [m.benign_qa_accuracy for m in metrics_list]
         hits = [m.context_hit_rate for m in metrics_list]
         faiths = [m.avg_faithfulness for m in metrics_list]
+        hallucinations = [m.hallucination_rate for m in metrics_list]
 
-        ax2.bar([i - w2 for i in x], safe_accs, width=w2, label="Safe Accuracy", color="#2b9348")
-        ax2.bar([i for i in x], hits, width=w2, label="Context Hit Rate", color="#0077b6")
-        ax2.bar([i + w2 for i in x], faiths, width=w2, label="Faithfulness (Grounded)", color="#55a630")
+        q1 = ax2.bar([i - 1.5 * w2 for i in x], benign_accs, width=w2, label="Benign QA Acc ↑", color="#2b9348")
+        q2 = ax2.bar([i - 0.5 * w2 for i in x], hits, width=w2, label="Context Hit Rate ↑", color="#0077b6")
+        q3 = ax2.bar([i + 0.5 * w2 for i in x], faiths, width=w2, label="Faithfulness ↑", color="#55a630")
+        q4 = ax2.bar([i + 1.5 * w2 for i in x], hallucinations, width=w2, label="Hallucination Rate ↓", color="#d90429")
 
-        ax2.set_title("2. Operational Quality (%) [Higher is Better]", fontsize=10, fontweight="bold")
+        # Value labels for Plot 2
+        for bars in (q1, q2, q3, q4):
+            for bar in bars:
+                h = bar.get_height()
+                if h > 0:
+                    ax2.annotate(
+                        f"{h:.0f}%",
+                        xy=(bar.get_x() + bar.get_width() / 2, h),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha="center",
+                        va="bottom",
+                        fontsize=6.5,
+                        fontweight="bold",
+                    )
+
+        ax2.set_title("2. Operational Quality (%) [Faithfulness/Hit: ↑ | Hallucination: ↓]", fontsize=10, fontweight="bold", pad=12)
         ax2.set_xticks(x)
         ax2.set_xticklabels(labels, fontweight="bold", fontsize=8)
-        ax2.set_ylabel("Quality Score (%)")
-        ax2.set_ylim(0, 105)
+        ax2.set_ylabel("Score (%)")
+        ax2.set_ylim(0, 135)  # Generous headroom to prevent legend overlap
         ax2.grid(axis="y", linestyle="--", alpha=0.5)
-        ax2.legend(loc="upper right", fontsize=7)
+        ax2.legend(loc="upper center", bbox_to_anchor=(0.5, 0.98), ncol=2, fontsize=7.5, framealpha=0.9)
 
         # Plot 3: Latency & Guardrail Overhead Breakdown (ms)
         ret_lats = [m.avg_latency_retrieval_ms for m in metrics_list]
@@ -306,12 +398,14 @@ class EvaluationReporter:
         bottom_sum = [ret_lats[i] + gen_lats[i] for i in range(len(labels))]
         p3 = ax3.bar(labels, overheads, width=0.45, bottom=bottom_sum, label="Guardrail Overhead", color="#e76f51")
 
-        ax3.set_title("3. Latency Breakdown (ms)", fontsize=10, fontweight="bold")
+        max_lat = max(m.avg_latency_total_ms for m in metrics_list) if metrics_list else 1000.0
+        ax3.set_title("3. Latency Breakdown (ms)", fontsize=10, fontweight="bold", pad=12)
         ax3.set_xticks(x)
         ax3.set_xticklabels(labels, fontweight="bold", fontsize=8)
         ax3.set_ylabel("Latency (ms)")
+        ax3.set_ylim(0, max_lat * 1.35)  # 35% empty space above highest bar
         ax3.grid(axis="y", linestyle="--", alpha=0.5)
-        ax3.legend(loc="upper left", fontsize=7)
+        ax3.legend(loc="upper left", bbox_to_anchor=(0.02, 0.98), fontsize=7.5, framealpha=0.9)
 
         for i, m in enumerate(metrics_list):
             total_h = m.avg_latency_total_ms
@@ -325,6 +419,66 @@ class EvaluationReporter:
                 fontweight="bold",
                 fontsize=8,
             )
+
+        # Plot 4: Defense-in-Depth Layer Interception Breakdown (%) [Guardrail Only]
+        guardrail_metrics = [m for m in metrics_list if "guardrail" in m.mode.lower()]
+        target_g_metrics = guardrail_metrics if guardrail_metrics else metrics_list
+
+        stage_names = ["Input Guard\n(Query/RBAC)", "Retrieval\nFilter", "Context\nSanitizer", "Output\nScanner"]
+        stage_colors = ["#e63946", "#e76f51", "#0077b6", "#f4a261"]
+
+        if len(target_g_metrics) == 1:
+            # Single guardrail mode: plot each stage as a distinct colored bar
+            gm = target_g_metrics[0]
+            stage_values = [gm.input_blocked_rate, gm.retrieval_filtered_rate, gm.context_sanitized_rate, gm.output_blocked_rate]
+            s_bars = ax4.bar(range(4), stage_values, color=stage_colors, width=0.5)
+            for bar, val in zip(s_bars, stage_values):
+                ax4.annotate(
+                    f"{val:.1f}%",
+                    xy=(bar.get_x() + bar.get_width() / 2, val),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    fontweight="bold",
+                )
+            ax4.set_xticks(range(4))
+            ax4.set_xticklabels(stage_names, fontweight="bold", fontsize=8)
+            short_g_model = gm.model_name.split("/")[-1] if gm.model_name else "Unknown"
+            exec_g_str = "Hosted" if gm.model_mode.lower() == "hosted" else "Local"
+            ax4.set_title(f"4. Guardrail Defense Stages [% of Threat Requests Intercepted]\n[{exec_g_str}: {short_g_model}]", fontsize=9.5, fontweight="bold", pad=12)
+        else:
+            # Multiple guardrail modes: group bars per stage
+            num_gm = len(target_g_metrics)
+            gw = 0.8 / num_gm
+            for g_idx, gm in enumerate(target_g_metrics):
+                short_g_model = gm.model_name.split("/")[-1] if gm.model_name else "Unknown"
+                exec_g_str = "Hosted" if gm.model_mode.lower() == "hosted" else "Local"
+                g_label = f"{gm.mode.title()} ({exec_g_str})"
+                stage_values = [gm.input_blocked_rate, gm.retrieval_filtered_rate, gm.context_sanitized_rate, gm.output_blocked_rate]
+                offset = (g_idx - (num_gm - 1) / 2) * gw
+                s_bars = ax4.bar([i + offset for i in range(4)], stage_values, width=gw, label=g_label)
+                for bar, val in zip(s_bars, stage_values):
+                    if val > 0:
+                        ax4.annotate(
+                            f"{val:.0f}%",
+                            xy=(bar.get_x() + bar.get_width() / 2, val),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha="center",
+                            va="bottom",
+                            fontsize=7,
+                            fontweight="bold",
+                        )
+            ax4.set_xticks(range(4))
+            ax4.set_xticklabels(stage_names, fontweight="bold", fontsize=8)
+            ax4.set_title("4. Guardrail Defense Stages [% of Threat Requests Intercepted]", fontsize=9.5, fontweight="bold", pad=12)
+            ax4.legend(loc="upper right", fontsize=7.5, framealpha=0.9)
+
+        ax4.set_ylabel("Threats Intercepted (%)")
+        ax4.set_ylim(0, 130)  # Generous headroom to keep labels clean
+        ax4.grid(axis="y", linestyle="--", alpha=0.5)
 
         plt.tight_layout()
 
